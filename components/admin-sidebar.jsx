@@ -90,7 +90,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`lg:hidden fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 z-40 transform transition-transform duration-300 ${
+        className={`lg:hidden fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 z-40 transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

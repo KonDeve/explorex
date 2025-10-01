@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react"
 
 export default function Home() {
   const [isVisible, setIsVisible] = useState({})
-  const [imageRotation, setImageRotation] = useState(0)
   const observerRef = useRef(null)
 
   useEffect(() => {
@@ -25,15 +24,6 @@ export default function Home() {
     sections.forEach((section) => observerRef.current.observe(section))
 
     return () => observerRef.current?.disconnect()
-  }, [])
-
-  // Image rotation animation
-  useEffect(() => {
-    const rotationInterval = setInterval(() => {
-      setImageRotation((prev) => (prev + 1) % 3)
-    }, 4000) // Change positions every 4 seconds
-
-    return () => clearInterval(rotationInterval)
   }, [])
 
   return (
@@ -114,55 +104,51 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Content - Image Collage */}
-          <div className="relative h-[600px] w-full max-w-[560px] hidden md:block ml-auto">
+          {/* Right Content - Image Grid */}
+          <div className="w-full max-w-[560px] ml-auto">
             {/* Decorative Circle - Top Right */}
-            <div className="absolute top-0 right-0 w-28 h-28 border-2 border-dashed border-blue-400 rounded-full flex items-center justify-center z-40 animate-spin" style={{ animationDuration: '10s' }}>
-              <span className="text-xs font-bold text-blue-500 text-center leading-tight" style={{ animation: 'reverse-spin 10s linear infinite' }}>EXPLORE</span>
-            </div>
+            {/* <div className="hidden lg:flex absolute top-0 right-0 w-20 h-20 border-2 border-dashed border-blue-400 rounded-full items-center justify-center z-10 -mt-4 -mr-4">
+              <span className="text-xs font-bold text-blue-500 text-center leading-tight">EXPLORE</span>
+            </div> */}
 
-            {/* Image 1 - Santorini with blue domes */}
-            <div 
-              className={`absolute rounded-[32px] overflow-hidden shadow-xl transition-all duration-1000 ease-in-out ${
-                imageRotation === 0 ? 'top-0 left-0 w-[320px] h-[360px] z-20' :
-                imageRotation === 1 ? 'top-24 right-0 w-[280px] h-[380px] z-30' :
-                'bottom-0 left-24 w-[300px] h-[300px] z-20'
-              }`}
-            >
-              <img src="/santorini-blue-domes-greece.jpg" alt="Santorini" className="w-full h-full object-cover" />
-            </div>
+            {/* Responsive Image Layout */}
+            <div className="relative space-y-4 md:space-y-6">
+              {/* Main Image - Santorini */}
+              <div className="rounded-2xl md:rounded-[32px] overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300">
+                <img 
+                  src="/santorini-blue-domes-greece.jpg" 
+                  alt="Santorini" 
+                  className="w-full h-48 sm:h-56 md:h-64 lg:h-72 object-cover" 
+                />
+              </div>
 
-            {/* Image 2 - Traveler with backpack */}
-            <div 
-              className={`absolute rounded-[32px] overflow-hidden shadow-2xl transition-all duration-1000 ease-in-out ${
-                imageRotation === 0 ? 'top-24 right-0 w-[280px] h-[380px] z-30' :
-                imageRotation === 1 ? 'bottom-0 left-24 w-[300px] h-[300px] z-20' :
-                'top-0 left-0 w-[320px] h-[360px] z-20'
-              }`}
-            >
-              <img src="/backpacker-with-hat-ocean-view.jpg" alt="Traveler" className="w-full h-full object-cover" />
-            </div>
+              {/* Two Column Layout for remaining images */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                {/* Traveler Image */}
+                <div className="rounded-2xl md:rounded-[32px] overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <img 
+                    src="/backpacker-with-hat-ocean-view.jpg" 
+                    alt="Traveler" 
+                    className="w-full h-40 sm:h-48 md:h-52 object-cover" 
+                  />
+                </div>
 
-            {/* Image 3 - White buildings with blue door */}
-            <div 
-              className={`absolute rounded-[32px] overflow-hidden shadow-xl transition-all duration-1000 ease-in-out ${
-                imageRotation === 0 ? 'bottom-0 left-24 w-[300px] h-[300px] z-20' :
-                imageRotation === 1 ? 'top-0 left-0 w-[320px] h-[360px] z-20' :
-                'top-24 right-0 w-[280px] h-[380px] z-30'
-              }`}
-            >
-              <img
-                src="/white-greek-buildings-blue-doors.jpg"
-                alt="Greek Architecture"
-                className="w-full h-full object-cover"
-              />
-            </div>
+                {/* Greek Architecture Image */}
+                <div className="rounded-2xl md:rounded-[32px] overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <img
+                    src="/white-greek-buildings-blue-doors.jpg"
+                    alt="Greek Architecture"
+                    className="w-full h-40 sm:h-48 md:h-52 object-cover"
+                  />
+                </div>
+              </div>
 
-            {/* Best Packages Link */}
-            <div className="absolute bottom-0 right-0 z-40">
-              <a href="#" className="text-blue-500 font-semibold hover:text-blue-700 transition-colors flex items-center gap-2 text-sm">
-                Best Packages →
-              </a>
+              {/* Best Packages Link */}
+              <div className="flex justify-end mt-4">
+                <a href="/packages" className="text-blue-500 font-semibold hover:text-blue-700 transition-colors flex items-center gap-2 text-sm">
+                  Best Packages →
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -371,60 +357,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile App Section */}
+      {/* Newsletter & Travel Tips Section */}
       <section className="container mx-auto px-4 py-16">
-        <div className="relative bg-white rounded-3xl p-12 overflow-hidden">
+        <div className="relative bg-gradient-to-br from-blue-50 to-indigo-100 rounded-3xl p-12 overflow-hidden">
           {/* Decorative Circles */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400 rounded-full -translate-y-1/2 translate-x-1/3 opacity-80"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-400 rounded-full translate-y-1/2 -translate-x-1/4 opacity-80"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400 rounded-full -translate-y-1/2 translate-x-1/3 opacity-20"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-400 rounded-full translate-y-1/2 -translate-x-1/4 opacity-20"></div>
 
           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div>
               <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-                Download our <span className="italic">app</span> to stay updated on your{" "}
-                <span className="italic">tour</span>
+                Stay updated with our <span className="italic text-blue-600">travel</span> tips and{" "}
+                <span className="italic text-blue-600">exclusive</span> deals
               </h2>
-              <p className="text-gray-600 mb-8">
-                Get real-time updates, exclusive deals, and personalized recommendations right at your fingertips.
+              <p className="text-gray-600 mb-8 leading-relaxed">
+                Join thousands of travelers who get insider tips, destination guides, and special offers delivered directly to their inbox.
               </p>
-              <div className="flex gap-4">
-                <button className="bg-gray-900 text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition">
-                  App Store
-                </button>
-                <button className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition">
-                  Google Play
-                </button>
+              
+              {/* Newsletter Signup */}
+              <div className="bg-white rounded-2xl p-6 shadow-lg">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <input
+                    type="email"
+                    placeholder="Enter your email address"
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  />
+                  <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                    Subscribe
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mt-3">No spam. Unsubscribe anytime.</p>
               </div>
             </div>
 
-            {/* Right - Phone Mockup */}
-            <div className="flex justify-center">
-              <div className="relative w-64 h-[500px] bg-white rounded-[3rem] border-8 border-gray-900 overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-900 rounded-b-2xl"></div>
-                <div className="p-6 pt-10 h-full overflow-y-auto">
-                  <h3 className="text-2xl font-bold mb-4">Explore</h3>
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <img
-                        src="/santorini-blue-domes-greece.jpg"
-                        alt="Destination"
-                        className="w-full h-32 object-cover rounded-lg mb-2"
-                      />
-                      <h4 className="font-semibold text-sm">Santorini</h4>
-                      <p className="text-xs text-gray-600">Greece</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <img
-                        src="/venice-italy-canal-buildings.jpg"
-                        alt="Destination"
-                        className="w-full h-32 object-cover rounded-lg mb-2"
-                      />
-                      <h4 className="font-semibold text-sm">Venice</h4>
-                      <p className="text-xs text-gray-600">Italy</p>
-                    </div>
-                  </div>
-                </div>
+            {/* Right - Travel Statistics */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-3xl font-bold text-blue-600 mb-2">250+</div>
+                <p className="text-gray-600 text-sm">Destinations Worldwide</p>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-3xl font-bold text-orange-500 mb-2">50K+</div>
+                <p className="text-gray-600 text-sm">Happy Travelers</p>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-3xl font-bold text-green-500 mb-2">15</div>
+                <p className="text-gray-600 text-sm">Years Experience</p>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-3xl font-bold text-purple-500 mb-2">24/7</div>
+                <p className="text-gray-600 text-sm">Customer Support</p>
               </div>
             </div>
           </div>
