@@ -36,7 +36,7 @@ export default function CustomerDashboard() {
       checkOut: "2025-06-22",
       guests: "2 Adults",
       image: "/santorini-blue-domes-greece.jpg",
-      status: "confirmed",
+      status: "confirmed"
     },
     {
       id: "BK-003",
@@ -46,7 +46,7 @@ export default function CustomerDashboard() {
       checkOut: "2025-08-16",
       guests: "4 Adults",
       image: "/mountain-lake-sunset-alps.jpg",
-      status: "confirmed",
+      status: "confirmed"
     },
   ]
 
@@ -56,9 +56,14 @@ export default function CustomerDashboard() {
       package: "Venice Romance",
       location: "Italy",
       date: "2024-12-10",
-      image: "/venice-italy-canal-buildings.jpg",
+      image: "/venice-italy-canal-buildings.jpg"
     },
   ]
+
+  const handleViewDetails = (booking) => {
+    // Navigate to trip details page
+    window.location.href = `/dashboard/trip/${booking.id}`
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -240,7 +245,10 @@ export default function CustomerDashboard() {
                           </div>
 
                           <div className="flex gap-4">
-                            <button className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                            <button 
+                              onClick={() => handleViewDetails(booking)}
+                              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
+                            >
                               View Details
                             </button>
                             <button className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-900 hover:text-gray-900 transition font-semibold">
@@ -298,7 +306,10 @@ export default function CustomerDashboard() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex gap-2">
-                                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                                <button 
+                                  onClick={() => handleViewDetails(booking)}
+                                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold"
+                                >
                                   View
                                 </button>
                                 <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:border-gray-900 hover:text-gray-900 transition text-sm font-semibold">
@@ -344,9 +355,17 @@ export default function CustomerDashboard() {
                         <span>{booking.location}</span>
                       </div>
                       <div className="text-sm text-gray-500 mb-4">Traveled on {booking.date}</div>
-                      <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition font-semibold">
-                        Leave a Review
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleViewDetails(booking)}
+                          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold"
+                        >
+                          View Details
+                        </button>
+                        <button className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition font-semibold">
+                          Leave Review
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

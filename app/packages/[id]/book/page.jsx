@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Calendar, Users, MapPin, Check, User, MessageSquare } from "lucide-react"
 import Link from "next/link"
+import Header from "@/components/header"
 import { useState, useEffect } from "react"
 
 export default function BookingPage({ params }) {
@@ -130,16 +131,9 @@ export default function BookingPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <header className="container mx-auto px-4 py-6 flex items-center justify-between border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <Link href="/" className="text-2xl font-bold">
-          Xplore<span className="text-blue-500 italic">x</span>
-        </Link>
-
-        <div className="flex items-center gap-4">
-          <span className="text-gray-600 text-sm">Need help?</span>
-          <span className="font-semibold text-gray-900">+1 (555) 123-4567</span>
-        </div>
-      </header>
+      <div className="bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <Header activePage="packages" />
+      </div>
 
       <div className="container mx-auto px-4 py-6">
         <Link

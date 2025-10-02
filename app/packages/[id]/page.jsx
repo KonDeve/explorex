@@ -48,22 +48,28 @@ export default function PackageDetailPage({ params }) {
       area: "Cyclades Islands",
       description:
         "Experience the magic of Santorini with its iconic blue-domed churches, stunning sunsets, and pristine beaches. This comprehensive package includes luxury accommodation, guided tours, and authentic Greek dining experiences.",
-      highlights: [
-        "Visit the famous blue-domed churches of Oia",
-        "Sunset cruise around the caldera",
-        "Wine tasting at local vineyards",
-        "Explore ancient ruins of Akrotiri",
-        "Relax on the unique red and black sand beaches",
-        "Traditional Greek cooking class",
-      ],
-      included: [
-        "Round-trip airport transfers",
-        "7 nights in 5-star hotel",
-        "Daily breakfast and dinner",
-        "All entrance fees",
-        "Professional English-speaking guide",
-        "Travel insurance",
-      ],
+      details: {
+        accommodation: {
+          title: "Hotel Accommodation",
+          nights: "6 nights stay at Santorini Blue Resort (Premium Suite)",
+          amenities: ["Free Wi-Fi", "Private balcony with caldera view", "Daily breakfast", "Infinity pool access", "Concierge service", "Airport transfers"]
+        },
+        transportation: {
+          title: "Transportation",
+          flights: "Round-trip flights from major cities to Santorini",
+          amenities: ["Premium economy seating", "In-flight meals", "Airport lounge access", "Travel insurance"],
+          local: "Private transfers and local transportation for all tour activities"
+        },
+        activities: {
+          title: "Tour Activities",
+          tours: ["Oia Village sunset tour", "Wine tasting at traditional wineries", "Caldera boat cruise", "Red Beach and Kamari Beach visits", "Fira town exploration"],
+          amenities: ["Professional tour guide", "All entrance fees included", "Photography sessions", "Traditional Greek lunch", "Bottled water and snacks"]
+        },
+        inclusions: {
+          title: "Other Inclusions",
+          items: ["Comprehensive travel insurance for 7 days", "Free welcome dinner with live music", "Souvenir shopping voucher worth $100", "24/7 customer support"]
+        }
+      }
     },
     2: {
       id: 2,
@@ -81,21 +87,28 @@ export default function PackageDetailPage({ params }) {
       area: "Veneto Region",
       description:
         "Discover the romantic charm of Venice with its winding canals, historic architecture, and world-class art. Perfect for couples seeking an unforgettable Italian getaway.",
-      highlights: [
-        "Private gondola ride through the canals",
-        "Visit St. Mark's Basilica and Doge's Palace",
-        "Explore the colorful island of Burano",
-        "Venetian mask-making workshop",
-        "Sunset aperitivo with canal views",
-      ],
-      included: [
-        "Airport water taxi transfers",
-        "5 nights in boutique hotel",
-        "Daily breakfast",
-        "Gondola ride",
-        "Museum passes",
-        "City walking tour",
-      ],
+      details: {
+        accommodation: {
+          title: "Hotel Accommodation",
+          nights: "4 nights stay at Hotel Danieli Venice (Canal View Room)",
+          amenities: ["Free Wi-Fi", "Canal view balcony", "Continental breakfast", "Room service", "Historic palazzo setting", "24-hour front desk"]
+        },
+        transportation: {
+          title: "Transportation",
+          flights: "Round-trip flights to Venice Marco Polo Airport",
+          amenities: ["Economy plus seating", "Checked baggage included", "Airport transfers via water taxi"],
+          local: "Vaporetto passes for Venice public water transport and walking tours"
+        },
+        activities: {
+          title: "Tour Activities",
+          tours: ["Private gondola ride through Grand Canal", "St. Mark's Basilica and Doge's Palace tour", "Murano and Burano islands excursion", "Traditional Venetian glass-making workshop", "Romantic dinner at canal-side restaurant"],
+          amenities: ["Licensed tour guide", "Skip-the-line tickets", "Traditional mask painting class", "Welcome prosecco", "Photography assistance"]
+        },
+        inclusions: {
+          title: "Other Inclusions",
+          items: ["Travel insurance for 5 days", "Venice city map and guidebook", "$75 restaurant voucher", "Free souvenir Venetian mask", "Emergency support hotline"]
+        }
+      }
     },
     3: {
       id: 3,
@@ -113,21 +126,28 @@ export default function PackageDetailPage({ params }) {
       area: "Swiss Alps",
       description:
         "Embark on an unforgettable alpine adventure with breathtaking mountain views, pristine lakes, and world-class skiing. Perfect for nature lovers and adventure seekers.",
-      highlights: [
-        "Ski or snowboard on pristine slopes",
-        "Scenic train ride through the Alps",
-        "Visit charming mountain villages",
-        "Fondue dinner with mountain views",
-        "Optional paragliding experience",
-      ],
-      included: [
-        "All transfers and transportation",
-        "6 nights in mountain lodge",
-        "All meals included",
-        "Ski pass and equipment rental",
-        "Mountain guide",
-        "Travel insurance",
-      ],
+      details: {
+        accommodation: {
+          title: "Hotel Accommodation",
+          nights: "5 nights stay at Alpine Grand Lodge (Mountain View Suite)",
+          amenities: ["Free Wi-Fi", "Mountain panorama views", "All meals included", "Spa and wellness center", "Heated indoor pool", "Ski equipment storage"]
+        },
+        transportation: {
+          title: "Transportation",
+          flights: "Round-trip flights to Zurich Airport with connecting train to resort",
+          amenities: ["Premium economy seating", "Swiss Travel Pass included", "Mountain railway tickets", "Airport and resort transfers"],
+          local: "Cable car passes and local shuttle service to ski slopes and attractions"
+        },
+        activities: {
+          title: "Tour Activities",
+          tours: ["Guided mountain hiking with professional alpine guide", "Jungfraujoch - Top of Europe excursion", "Lake Geneva boat cruise", "Traditional Swiss cheese and chocolate factory tours", "Paragliding experience (weather permitting)"],
+          amenities: ["Certified mountain guide", "All safety equipment provided", "Alpine photography sessions", "Swiss traditional lunch", "Emergency mountain rescue insurance"]
+        },
+        inclusions: {
+          title: "Other Inclusions",
+          items: ["Comprehensive travel and adventure insurance for 6 days", "Swiss knife souvenir", "$120 shopping voucher for Swiss products", "Traditional Swiss fondue dinner", "24/7 mountain rescue support"]
+        }
+      }
     },
     4: {
       id: 4,
@@ -145,21 +165,28 @@ export default function PackageDetailPage({ params }) {
       area: "Maldives Atolls",
       description:
         "Escape to paradise with crystal-clear waters, white sand beaches, and luxury overwater villas. The ultimate tropical getaway for relaxation and romance.",
-      highlights: [
-        "Stay in overwater villa with private pool",
-        "Snorkeling with tropical fish and turtles",
-        "Sunset dolphin cruise",
-        "Couples spa treatments",
-        "Private beach dinner under the stars",
-      ],
-      included: [
-        "Seaplane transfers",
-        "8 nights in beach villa",
-        "All meals and drinks",
-        "Water sports equipment",
-        "Spa access",
-        "Excursions",
-      ],
+      details: {
+        accommodation: {
+          title: "Hotel Accommodation",
+          nights: "7 nights stay at Maldives Paradise Resort (Overwater Villa)",
+          amenities: ["Free Wi-Fi", "Private deck with ocean access", "All meals and beverages", "Butler service", "Spa treatments", "Water sports equipment"]
+        },
+        transportation: {
+          title: "Transportation",
+          flights: "Round-trip flights with seaplane transfer to resort",
+          amenities: ["Business class upgrade available", "Champagne service", "Priority check-in", "Scenic seaplane flight"],
+          local: "Resort boat transfers and island hopping excursions included"
+        },
+        activities: {
+          title: "Tour Activities",
+          tours: ["Snorkeling and diving expeditions", "Dolphin watching cruise", "Sunset fishing trip", "Island hopping to local villages", "Couples spa treatments and beach dining"],
+          amenities: ["PADI certified dive instructors", "All water sports equipment", "Underwater photography", "Traditional Maldivian cultural show", "Private beach access"]
+        },
+        inclusions: {
+          title: "Other Inclusions",
+          items: ["Comprehensive travel insurance for 8 days", "Underwater camera rental", "$200 spa credit", "Romantic beachside dinner setup", "24/7 resort concierge service"]
+        }
+      }
     },
     5: {
       id: 5,
@@ -209,21 +236,28 @@ export default function PackageDetailPage({ params }) {
       area: "Mediterranean Sea",
       description:
         "Sail the Mediterranean in luxury, visiting iconic ports across multiple countries. Enjoy world-class dining, entertainment, and shore excursions.",
-      highlights: [
-        "Visit 8 ports in 5 countries",
-        "Luxury cruise ship amenities",
-        "Guided shore excursions",
-        "Gourmet dining experiences",
-        "Evening entertainment shows",
-      ],
-      included: [
-        "12-day cruise accommodation",
-        "All meals and snacks",
-        "Shore excursions",
-        "Entertainment",
-        "Port taxes",
-        "Onboard activities",
-      ],
+      details: {
+        accommodation: {
+          title: "Cruise Accommodation",
+          nights: "11 nights aboard luxury cruise ship (Balcony Stateroom)",
+          amenities: ["Private balcony with ocean views", "24-hour room service", "All meals and beverages included", "Nightly turndown service", "Concierge services", "Premium bedding and amenities"]
+        },
+        transportation: {
+          title: "Transportation",
+          flights: "Round-trip flights to Barcelona with cruise port transfers",
+          amenities: ["Premium economy flights", "Priority boarding", "Airport lounge access", "Cruise terminal transfers"],
+          local: "Luxury cruise ship with stops in Barcelona, Monaco, Rome, Santorini, Mykonos, and Naples"
+        },
+        activities: {
+          title: "Shore Excursions & Activities",
+          tours: ["Guided tours in each port city", "Vatican Museums and Sistine Chapel (Rome)", "Monte Carlo casino and palace visit", "Santorini wine tasting and sunset viewing", "Pompeii archaeological site exploration"],
+          amenities: ["Professional shore excursion guides", "All entrance fees included", "Onboard entertainment and shows", "Multiple dining venues", "Spa and fitness facilities"]
+        },
+        inclusions: {
+          title: "Other Inclusions",
+          items: ["Comprehensive cruise and travel insurance for 12 days", "Onboard WiFi package", "$300 onboard credit for spa and shopping", "Captain's gala dinner", "24/7 guest services and medical facilities"]
+        }
+      }
     },
   }
 
@@ -352,62 +386,171 @@ export default function PackageDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Highlights */}
-            <div
-              id="highlights"
-              data-animate
-              className={`bg-white rounded-2xl p-8 transition-all duration-700 ${
-                isVisible.highlights ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-              }`}
-            >
-              <h2 className="text-2xl font-bold mb-6">Tour Highlights</h2>
-              <div className="grid md:grid-cols-2 gap-4">
-                {pkg.highlights.map((highlight, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Check className="text-green-500 flex-shrink-0 mt-1" size={20} />
-                    <span className="text-gray-700">{highlight}</span>
+            {/* Detailed Package Information */}
+            {pkg.details && (
+              <>
+                {/* Hotel Accommodation */}
+                <div
+                  id="accommodation"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible.accommodation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  <h2 className="text-2xl font-bold mb-6">{pkg.details.accommodation.title}</h2>
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">{pkg.details.accommodation.nights}</h3>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">Amenities:</h4>
+                    <div className="grid md:grid-cols-2 gap-2">
+                      {pkg.details.accommodation.amenities.map((amenity, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Check className="text-green-500 flex-shrink-0" size={16} />
+                          <span className="text-gray-700">{amenity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-            {/* What's Included */}
-            <div
-              id="included"
-              data-animate
-              className={`bg-white rounded-2xl p-8 transition-all duration-700 ${
-                isVisible.included ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-              }`}
-            >
-              <h2 className="text-2xl font-bold mb-6">What's Included</h2>
-              <div className="space-y-3">
-                {pkg.included.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <Check className="text-blue-500" size={20} />
-                    <span className="text-gray-700">{item}</span>
+                {/* Transportation */}
+                <div
+                  id="transportation"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible.transportation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  <h2 className="text-2xl font-bold mb-6">{pkg.details.transportation.title}</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-2">{pkg.details.transportation.flights}</h3>
+                      <div className="grid md:grid-cols-2 gap-2">
+                        {pkg.details.transportation.amenities.map((amenity, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Check className="text-blue-500 flex-shrink-0" size={16} />
+                            <span className="text-gray-700">{amenity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Local Transportation:</h4>
+                      <p className="text-gray-700">{pkg.details.transportation.local}</p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+
+                {/* Tour Activities */}
+                <div
+                  id="activities"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible.activities ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  <h2 className="text-2xl font-bold mb-6">{pkg.details.activities.title}</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Included Tours & Experiences:</h3>
+                      <div className="space-y-2 mb-4">
+                        {pkg.details.activities.tours.map((tour, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <Check className="text-purple-500 flex-shrink-0 mt-1" size={16} />
+                            <span className="text-gray-700">{tour}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-3">Tour Amenities:</h4>
+                      <div className="grid md:grid-cols-2 gap-2">
+                        {pkg.details.activities.amenities.map((amenity, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Check className="text-orange-500 flex-shrink-0" size={16} />
+                            <span className="text-gray-700">{amenity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Other Inclusions */}
+                <div
+                  id="inclusions"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible.inclusions ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  <h2 className="text-2xl font-bold mb-6">{pkg.details.inclusions.title}</h2>
+                  <div className="space-y-2">
+                    {pkg.details.inclusions.items.map((item, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <Check className="text-red-500 flex-shrink-0 mt-1" size={16} />
+                        <span className="text-gray-700">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Lead Information */}
-            <div className="bg-white rounded-2xl p-6">
-              <div className="mb-6">
-                <div className="text-sm text-gray-500 mb-1">Lead Architect</div>
-                <div className="font-bold text-lg">{pkg.leadArchitect}</div>
+            {/* Package Features Overview */}
+            <div className="bg-white rounded-2xl p-6 shadow-none border border-gray-200">
+              <h3 className="font-bold text-lg mb-4">What this trip includes</h3>
+              <div className="space-y-3">
+                {pkg.features && pkg.features.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <Check className="text-green-500 flex-shrink-0" size={16} />
+                    <span className="text-gray-700">{feature}</span>
+                  </div>
+                ))}
               </div>
 
-              <div className="mb-6">
-                <div className="text-sm text-gray-500 mb-1">Tour Operator</div>
-                <div className="font-bold text-lg">{pkg.tourOperator}</div>
-              </div>
-
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Area</div>
-                <div className="font-bold text-lg">{pkg.area}</div>
+              {/* Trip Details */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="font-bold text-lg mb-4">Trip Details</h4>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Calendar size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Duration</div>
+                        <div className="font-semibold text-gray-900">{pkg.duration}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Users size={16} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Group Size</div>
+                        <div className="font-semibold text-gray-900">{pkg.people}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <Star size={16} className="text-yellow-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Rating</div>
+                        <div className="font-semibold text-gray-900">{pkg.rating}/5 Stars</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -436,18 +579,7 @@ export default function PackageDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Features */}
-            <div className="bg-white rounded-2xl p-6">
-              <h3 className="font-bold text-lg mb-4">Package Features</h3>
-              <div className="space-y-3">
-                {pkg.features.map((feature, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm">
-                    <Check size={16} className="text-green-500" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+
           </div>
         </div>
       </section>
