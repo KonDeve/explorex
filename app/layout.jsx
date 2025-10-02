@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
+import { Providers } from "@/components/providers"
 
 const workSans = Work_Sans({
   subsets: ["latin"],
@@ -25,10 +26,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`font-sans ${workSans.variable} ${openSans.variable} antialiased`}>
-        {children}
-        <Suspense fallback={null}>
-          <Analytics />
-        </Suspense>
+        <Providers>
+          {children}
+          <Suspense fallback={null}>
+            <Analytics />
+          </Suspense>
+        </Providers>
       </body>
     </html>
   )

@@ -4,10 +4,33 @@ import Header from "@/components/header"
 import { Calendar, MapPin, CreditCard, User, Settings, LogOut, Package, LayoutGrid, Table } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function CustomerDashboard() {
+  const router = useRouter()
+  const { user, profile, isAuthenticated, loading } = useAuth()
   const [viewMode, setViewMode] = useState("card")
   const [isVisible, setIsVisible] = useState({})
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [loading, isAuthenticated, router])
+
+  // Get first name for welcome message
+  const firstName = profile?.first_name || "User"
+  const profileImageUrl = profile?.profile_image_url
+  
+  // Get user initials for avatar
+  const getInitials = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+    }
+    return "U"
+  }
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -73,11 +96,19 @@ export default function CustomerDashboard() {
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-8 md:p-12 text-white mb-8 animate-fade-in">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl font-bold">
-              J
-            </div>
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt="Profile"
+                className="w-20 h-20 rounded-full object-cover ring-4 ring-white/30"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl font-bold">
+                {getInitials()}
+              </div>
+            )}
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">Welcome back, John!</h1>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">Welcome back, {firstName}!</h1>
               <p className="text-blue-100">Ready for your next adventure?</p>
             </div>
           </div>
@@ -202,57 +233,84 @@ export default function CustomerDashboard() {
                   {upcomingBookings.map((booking) => (
                     <div
                       key={booking.id}
-                      className="bg-white rounded-2xl border border-gray-200 overflow-hidden transition"
+                      className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition"
                     >
-                      <div className="grid md:grid-cols-3 gap-0">
-                        <div className="relative h-64 md:h-auto overflow-hidden">
+                      <div className="grid md:grid-cols-[280px_1fr] gap-0">
+                        <div className="relative h-full overflow-hidden">
                           <img
                             src={booking.image || "/placeholder.svg"}
                             alt={booking.package}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute top-4 right-4">
-                            <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                              {booking.status}
+                          <div className="absolute top-4 left-4">
+                            <span className="bg-orange-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold">
+                              Partial Payment
                             </span>
                           </div>
                         </div>
-                        <div className="md:col-span-2 p-8">
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <h3 className="text-2xl font-bold text-gray-900 mb-2">{booking.package}</h3>
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <MapPin size={16} />
-                                <span>{booking.location}</span>
-                              </div>
-                            </div>
+                        <div className="p-6">
+                          <div className="flex items-start justify-between mb-6">
+                            <h3 className="text-2xl font-bold text-gray-900">{booking.package}</h3>
                             <div className="text-sm text-gray-500">Booking ID: {booking.id}</div>
                           </div>
 
-                          <div className="grid md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                              <div className="text-sm text-gray-600 mb-1">Check-in</div>
-                              <div className="font-semibold text-gray-900">{booking.checkIn}</div>
+                          <div className="grid grid-cols-2 gap-6 mb-6">
+                            <div className="flex items-start gap-3">
+                              <Calendar size={20} className="text-gray-400 mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-500 mb-1">Travel Date</div>
+                                <div className="text-sm text-gray-900">{booking.checkIn} - {booking.checkOut}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-sm text-gray-600 mb-1">Check-out</div>
-                              <div className="font-semibold text-gray-900">{booking.checkOut}</div>
+                            <div className="flex items-start gap-3">
+                              <MapPin size={20} className="text-gray-400 mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-500 mb-1">Destination</div>
+                                <div className="text-sm text-gray-900">{booking.location}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-sm text-gray-600 mb-1">Guests</div>
-                              <div className="font-semibold text-gray-900">{booking.guests}</div>
+                            <div className="flex items-start gap-3">
+                              <User size={20} className="text-gray-400 mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-500 mb-1">Travellers</div>
+                                <div className="text-sm text-gray-900">{booking.guests}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <Calendar size={20} className="text-gray-400 mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-500 mb-1">Booked On</div>
+                                <div className="text-sm text-gray-900">February 6, 2026</div>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex gap-4">
+                          <div className="grid grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-200">
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Total Package</div>
+                              <div className="text-lg font-bold text-gray-900">₱50,000</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Amount Paid</div>
+                              <div className="text-lg font-bold text-green-600">₱25,000</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Remaining Balance</div>
+                              <div className="text-lg font-bold text-orange-600">₱25,000</div>
+                              <div className="text-xs text-gray-400">Due: 2/23/26</div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
                             <button 
                               onClick={() => handleViewDetails(booking)}
-                              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
+                              className="flex-1 bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition font-medium"
                             >
                               View Details
                             </button>
-                            <button className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-900 hover:text-gray-900 transition font-semibold">
-                              Manage Booking
+                            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
+                              <CreditCard size={18} />
+                              Pay Remaining Balance
                             </button>
                           </div>
                         </div>

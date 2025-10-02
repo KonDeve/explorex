@@ -1,13 +1,17 @@
 "use client"
 
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Calendar, Users, Star, Check } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Calendar, Users, Star, Check, Lock } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import Header from "@/components/header"
+import { useAuth } from "@/lib/AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function PackageDetailPage({ params }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isVisible, setIsVisible] = useState({})
+  const { isAuthenticated, loading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -562,12 +566,29 @@ export default function PackageDetailPage({ params }) {
                 <div className="text-blue-100 text-sm">per person</div>
               </div>
 
-              <Link
-                href={`/packages/${params.id}/book`}
-                className="w-full bg-white text-blue-500 py-3 rounded-lg hover:bg-gray-100 transition font-bold text-lg mb-4 block text-center"
-              >
-                Book This Package
-              </Link>
+              {loading ? (
+                <div className="w-full bg-white/20 py-3 rounded-lg mb-4 animate-pulse h-[48px]"></div>
+              ) : isAuthenticated ? (
+                <Link
+                  href={`/packages/${params.id}/book`}
+                  className="w-full bg-white text-blue-500 py-3 rounded-lg hover:bg-gray-100 transition font-bold text-lg mb-4 block text-center"
+                >
+                  Book This Package
+                </Link>
+              ) : (
+                <div className="mb-4">
+                  <button
+                    onClick={() => router.push('/login')}
+                    className="w-full bg-white text-blue-500 py-3 rounded-lg hover:bg-gray-100 transition font-bold text-lg mb-3 flex items-center justify-center gap-2"
+                  >
+                    <Lock size={18} />
+                    Login to Book
+                  </button>
+                  <p className="text-blue-100 text-xs text-center">
+                    Please log in or sign up to book this package
+                  </p>
+                </div>
+              )}
 
               <button className="w-full bg-blue-700 text-white py-3 rounded-lg hover:bg-blue-800 transition font-semibold">
                 Contact Us

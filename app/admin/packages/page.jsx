@@ -2,13 +2,12 @@
 
 import { Plus, Edit, Trash2, Eye, MapPin, Calendar, Users, DollarSign, Search, Grid, List } from "lucide-react"
 import { useState } from "react"
-import PackageModal from "@/components/package-modal"
+import { useRouter } from "next/navigation"
 
 export default function AdminPackages() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState("grid") // Added view mode toggle
-  const [isModalOpen, setIsModalOpen] = useState(false) // Added modal state
-  const [editingPackage, setEditingPackage] = useState(null) // Track package being edited
 
   const packages = [
     {
@@ -54,13 +53,11 @@ export default function AdminPackages() {
   ]
 
   const handleCreatePackage = () => {
-    setEditingPackage(null)
-    setIsModalOpen(true)
+    router.push('/admin/packages/add')
   }
 
   const handleEditPackage = (pkg) => {
-    setEditingPackage(pkg)
-    setIsModalOpen(true)
+    router.push(`/admin/packages/edit/${pkg.id}`)
   }
 
   return (
@@ -262,8 +259,6 @@ export default function AdminPackages() {
           </div>
         </div>
       )}
-
-      <PackageModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} package={editingPackage} />
     </div>
   )
 }

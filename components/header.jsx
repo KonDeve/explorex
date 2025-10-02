@@ -1,24 +1,28 @@
 "use client"
 
 import Link from "next/link"
-import { User, Shield, Menu, X } from "lucide-react"
+import { User, Shield, Menu, X, LogIn, UserPlus } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function Header({ activePage = "home" }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const isLoggedIn = true // In production, this would come from auth context
-  const isAdmin = true // In production, this would come from user role in auth context
+  const { user, profile, isAuthenticated, isAdmin, loading } = useAuth()
+  
+  // Get user's full name from profile
+  const userFullName = profile ? `${profile.first_name} ${profile.last_name}` : 'My Account'
 
-  const navLinks = [
+  // Base navigation links always visible
+  const baseNavLinks = [
     { name: "Home", href: "/", key: "home" },
     { name: "About", href: "/about", key: "about" },
     { name: "Packages", href: "/packages", key: "packages" },
-    { name: "Community", href: "/community", key: "community" },
   ]
 
-  if (isLoggedIn) {
-    navLinks.push({ name: "Dashboard", href: "/dashboard", key: "dashboard" })
-  }
+  // Add Dashboard only if user is logged in
+  const navLinks = isAuthenticated 
+    ? [...baseNavLinks, { name: "Dashboard", href: "/dashboard", key: "dashboard" }]
+    : baseNavLinks
 
   return (
     <>
@@ -34,8 +38,8 @@ export default function Header({ activePage = "home" }) {
           </button>
 
           {/* Mobile Logo - Center */}
-          <Link href="/" className="text-2xl font-bold absolute left-1/2 transform -translate-x-1/2">
-            Xplore<span className="text-blue-500 italic">x</span>
+          <Link href="/" className="absolute left-1/2 transform -translate-x-1/2">
+            <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-8 w-auto" />
           </Link>
 
           {/* Empty div for balance - Right */}
@@ -44,8 +48,8 @@ export default function Header({ activePage = "home" }) {
 
         {/* Desktop Layout */}
         <div className="hidden md:flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold">
-            Xplore<span className="text-blue-500 italic">x</span>
+          <Link href="/" className="flex items-center">
+            <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-7 w-auto" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -63,7 +67,9 @@ export default function Header({ activePage = "home" }) {
 
           {/* Desktop Auth Buttons */}
           <div className="flex items-center gap-3">
-            {isLoggedIn ? (
+            {loading ? (
+              <div className="w-32 h-10 bg-gray-200 animate-pulse rounded-full"></div>
+            ) : isAuthenticated ? (
               <>
                 {isAdmin && (
                   <Link
@@ -79,13 +85,26 @@ export default function Header({ activePage = "home" }) {
                   className="bg-gray-900 text-white px-3 lg:px-6 py-2 rounded-full hover:bg-gray-800 transition flex items-center gap-2"
                 >
                   <User size={18} />
-                  <span className="hidden lg:inline">My Account</span>
+                  <span className="hidden lg:inline">{userFullName}</span>
                 </Link>
               </>
             ) : (
-              <Link href="/signup" className="bg-gray-900 text-white px-4 lg:px-6 py-2 rounded-full hover:bg-gray-800 transition">
-                Sign up
-              </Link>
+              <>
+                <Link 
+                  href="/login" 
+                  className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-full hover:bg-gray-100 transition flex items-center gap-2"
+                >
+                  <LogIn size={18} />
+                  <span>Login</span>
+                </Link>
+                <Link 
+                  href="/signup" 
+                  className="bg-gray-900 text-white px-4 lg:px-6 py-2 rounded-full hover:bg-gray-800 transition flex items-center gap-2"
+                >
+                  <UserPlus size={18} />
+                  <span>Sign Up</span>
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -106,8 +125,8 @@ export default function Header({ activePage = "home" }) {
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`} onClick={(e) => e.stopPropagation()}>
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold" onClick={() => setIsMobileMenuOpen(false)}>
-              Xplore<span className="text-blue-500 italic">x</span>
+            <Link href="/" className="flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
+              <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-8 w-auto" />
             </Link>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
@@ -136,7 +155,9 @@ export default function Header({ activePage = "home" }) {
 
             {/* Mobile Auth Buttons */}
             <div className="p-4 border-t border-gray-200 space-y-3">
-              {isLoggedIn ? (
+              {loading ? (
+                <div className="w-full h-12 bg-gray-200 animate-pulse rounded-lg"></div>
+              ) : isAuthenticated ? (
                 <>
                   {isAdmin && (
                     <Link
@@ -154,17 +175,28 @@ export default function Header({ activePage = "home" }) {
                     className="w-full bg-gray-900 text-white px-4 py-3 rounded-lg hover:bg-gray-800 transition flex items-center justify-center gap-2"
                   >
                     <User size={18} />
-                    <span>My Account</span>
+                    <span>{userFullName}</span>
                   </Link>
                 </>
               ) : (
-                <Link 
-                  href="/signup" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full bg-gray-900 text-white px-4 py-3 rounded-lg hover:bg-gray-800 transition text-center block"
-                >
-                  Sign up
-                </Link>
+                <>
+                  <Link 
+                    href="/login" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full border border-gray-900 text-gray-900 px-4 py-3 rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                  >
+                    <LogIn size={18} />
+                    <span>Login</span>
+                  </Link>
+                  <Link 
+                    href="/signup" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full bg-gray-900 text-white px-4 py-3 rounded-lg hover:bg-gray-800 transition flex items-center justify-center gap-2"
+                  >
+                    <UserPlus size={18} />
+                    <span>Sign Up</span>
+                  </Link>
+                </>
               )}
             </div>
         </div>

@@ -157,9 +157,8 @@ export default function TripDetailsPage({ params }) {
   const booking = getBookingById(id)
   const [activeTab, setActiveTab] = useState('property-details')
   const [isLoaded, setIsLoaded] = useState(false)
-  const [visibleSections, setVisibleSections] = useState(new Set())
   const [tabContentLoaded, setTabContentLoaded] = useState(false)
-  const sectionRefs = useRef({})
+  const [isVisible, setIsVisible] = useState({})
 
   useEffect(() => {
     // Trigger animations after component mounts
@@ -171,30 +170,24 @@ export default function TripDetailsPage({ params }) {
   }, [])
 
   useEffect(() => {
-    const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible((prev) => ({ ...prev, [entry.target.id]: true }))
+          }
+        })
+      },
+      { threshold: 0.1 },
+    )
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setVisibleSections(prev => new Set([...prev, entry.target.dataset.section]))
-        }
-      })
-    }, observerOptions)
-
-    // Observe all sections
-    Object.values(sectionRefs.current).forEach(ref => {
-      if (ref) observer.observe(ref)
-    })
+    const sections = document.querySelectorAll("[data-animate]")
+    sections.forEach((section) => observer.observe(section))
 
     return () => observer.disconnect()
   }, [])
 
-  const setSectionRef = (sectionName) => (el) => {
-    sectionRefs.current[sectionName] = el
-  }
+
 
   // Handle tab switching with animation reset
   const handleTabChange = (newTab) => {
@@ -317,15 +310,7 @@ export default function TripDetailsPage({ params }) {
           {/* Left Content */}
           <div className="lg:col-span-2">
             {/* Host Info */}
-            <div 
-              ref={setSectionRef('host-info')}
-              data-section="host-info"
-              className={`pb-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                visibleSections.has('host-info') 
-                  ? 'opacity-100 translate-y-0' 
-                  : 'opacity-0 translate-y-8'
-              }`}
-            >
+            <div className="pb-8 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-semibold mb-2">{booking.package} hosted by {booking.hotelName}</h2>
@@ -346,45 +331,21 @@ export default function TripDetailsPage({ params }) {
             </div>
 
             {/* Booking Details */}
-            <div 
-              ref={setSectionRef('booking-details')}
-              data-section="booking-details"
-              className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out delay-100 ${
-                visibleSections.has('booking-details') 
-                  ? 'opacity-100 translate-y-0' 
-                  : 'opacity-0 translate-y-8'
-              }`}
-            >
+            <div className="py-8 border-b border-gray-200">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className={`text-center p-4 bg-gray-50 rounded-lg transition-all duration-500 ease-out ${
-                  visibleSections.has('booking-details') 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-4'
-                }`} style={{transitionDelay: visibleSections.has('booking-details') ? '200ms' : '0ms'}}>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500 mb-1">Booking ID</div>
                   <div className="font-semibold">{booking.id}</div>
                 </div>
-                <div className={`text-center p-4 bg-gray-50 rounded-lg transition-all duration-500 ease-out ${
-                  visibleSections.has('booking-details') 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-4'
-                }`} style={{transitionDelay: visibleSections.has('booking-details') ? '300ms' : '0ms'}}>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500 mb-1">Confirmation</div>
                   <div className="font-semibold text-blue-600">{booking.confirmation}</div>
                 </div>
-                <div className={`text-center p-4 bg-gray-50 rounded-lg transition-all duration-500 ease-out ${
-                  visibleSections.has('booking-details') 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-4'
-                }`} style={{transitionDelay: visibleSections.has('booking-details') ? '400ms' : '0ms'}}>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500 mb-1">Total Paid</div>
                   <div className="font-bold text-green-600">{booking.totalPrice}</div>
                 </div>
-                <div className={`text-center p-4 bg-gray-50 rounded-lg transition-all duration-500 ease-out ${
-                  visibleSections.has('booking-details') 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-4'
-                }`} style={{transitionDelay: visibleSections.has('booking-details') ? '500ms' : '0ms'}}>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500 mb-1">Status</div>
                   <div className={`font-semibold ${booking.type === 'upcoming' ? 'text-green-600' : 'text-blue-600'}`}>
                     {booking.type === 'upcoming' ? 'Confirmed' : 'Completed'}
@@ -394,15 +355,7 @@ export default function TripDetailsPage({ params }) {
             </div>
 
             {/* Tab Navigation */}
-            <div 
-              ref={setSectionRef('tab-navigation')}
-              data-section="tab-navigation"
-              className={`pt-8 pb-4 transition-all duration-700 ease-out delay-200 ${
-                visibleSections.has('tab-navigation') 
-                  ? 'opacity-100 translate-y-0' 
-                  : 'opacity-0 translate-y-8'
-              }`}
-            >
+            <div className="pt-8 pb-4">
               <div className="flex space-x-8">
                 <button 
                   onClick={() => handleTabChange('property-details')}
@@ -452,43 +405,26 @@ export default function TripDetailsPage({ params }) {
             {activeTab === 'property-details' && (
               <>
                 {/* Description */}
-                <div 
-                  className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                    activeTab === 'property-details' && tabContentLoaded 
-                      ? 'opacity-100 translate-y-0' 
-                      : 'opacity-0 translate-y-8'
+                <div
+                  id="details"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible.details ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                   }`}
                 >
-                  <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                    activeTab === 'property-details' && tabContentLoaded 
-                      ? 'opacity-100 translate-x-0' 
-                      : 'opacity-0 -translate-x-4'
-                  }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '100ms' : '0ms'}}>
-                    Description
-                  </h3>
+                  <div className="text-sm text-gray-500 mb-2">(01) Specifications</div>
+                  <h1 className="text-5xl font-bold mb-4">{booking.package}</h1>
                   <div className="space-y-4 text-gray-700 leading-relaxed">
-                    <p className={`transition-all duration-500 ease-out ${
-                      activeTab === 'property-details' && tabContentLoaded 
-                        ? 'opacity-100 translate-x-0' 
-                        : 'opacity-0 -translate-x-4'
-                    }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '200ms' : '0ms'}}>
+                    <p>
                       Experience the ultimate {booking.location} getaway with our carefully curated {booking.package.toLowerCase()} package. 
                       This exceptional journey combines luxury accommodation with authentic local experiences, 
                       creating memories that will last a lifetime.
                     </p>
-                    <p className={`transition-all duration-500 ease-out ${
-                      activeTab === 'property-details' && tabContentLoaded 
-                        ? 'opacity-100 translate-x-0' 
-                        : 'opacity-0 -translate-x-4'
-                    }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '300ms' : '0ms'}}>
+                    <p>
                       Nestled in the heart of {booking.location}, our {booking.hotelName} offers breathtaking views and world-class amenities. 
                       From the moment you arrive, you'll be immersed in the local culture while enjoying premium comfort and service.
                     </p>
-                    <p className={`transition-all duration-500 ease-out ${
-                      activeTab === 'property-details' && tabContentLoaded 
-                        ? 'opacity-100 translate-x-0' 
-                        : 'opacity-0 -translate-x-4'
-                    }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '400ms' : '0ms'}}>
+                    <p>
                       Our expertly crafted itinerary includes guided tours, authentic dining experiences, and plenty of free time 
                       to explore at your own pace. Whether you're seeking adventure or relaxation, this trip offers the perfect balance.
                     </p>
@@ -496,34 +432,19 @@ export default function TripDetailsPage({ params }) {
                 </div>
 
                 {/* What this trip includes */}
-                <div 
-                  className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                    activeTab === 'property-details' && tabContentLoaded 
-                      ? 'opacity-100 translate-y-0' 
-                      : 'opacity-0 translate-y-8'
+                <div
+                  id="trip-includes"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    isVisible['trip-includes'] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                   }`}
-                  style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '500ms' : '0ms'}}
                 >
-                  <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                    activeTab === 'property-details' && tabContentLoaded 
-                      ? 'opacity-100 translate-x-0' 
-                      : 'opacity-0 -translate-x-4'
-                  }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '600ms' : '0ms'}}>
-                    What this trip includes
-                  </h3>
+                  <h3 className="font-bold text-lg mb-4">What this trip includes</h3>
                   
                   {/* Trip Features from booking data */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                     {booking.features.map((feature, index) => (
-                      <div 
-                        key={index} 
-                        className={`flex items-center gap-3 py-2 transition-all duration-500 ease-out ${
-                          activeTab === 'property-details' && tabContentLoaded 
-                            ? 'opacity-100 translate-x-0' 
-                            : 'opacity-0 -translate-x-4'
-                        }`}
-                        style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? `${700 + index * 100}ms` : '0ms'}}
-                      >
+                      <div key={index} className="flex items-center gap-3 py-2">
                         <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
                         <span className="text-gray-700 font-medium">{feature}</span>
                       </div>
@@ -531,49 +452,24 @@ export default function TripDetailsPage({ params }) {
                   </div>
 
                   {/* Additional Trip Details */}
-                  <div 
-                    className={`bg-gray-50 rounded-lg p-6 transition-all duration-700 ease-out ${
-                      activeTab === 'property-details' && tabContentLoaded 
-                        ? 'opacity-100 scale-100' 
-                        : 'opacity-0 scale-95'
-                    }`}
-                    style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1200ms' : '0ms'}}
-                  >
-                    <h4 className={`font-semibold text-gray-900 mb-4 transition-all duration-500 ease-out ${
-                      activeTab === 'property-details' && tabContentLoaded 
-                        ? 'opacity-100 translate-y-0' 
-                        : 'opacity-0 translate-y-4'
-                    }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1300ms' : '0ms'}}>
-                      Trip Details
-                    </h4>
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h4 className="font-semibold text-gray-900 mb-4">Trip Details</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className={`text-center transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-6'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1400ms' : '0ms'}}>
+                      <div className="text-center">
                         <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                           <Calendar size={24} className="text-blue-600" />
                         </div>
                         <div className="text-sm text-gray-500">Duration</div>
                         <div className="font-semibold text-gray-900">{booking.duration}</div>
                       </div>
-                      <div className={`text-center transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-6'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1500ms' : '0ms'}}>
+                      <div className="text-center">
                         <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                           <Users size={24} className="text-purple-600" />
                         </div>
                         <div className="text-sm text-gray-500">Group Size</div>
                         <div className="font-semibold text-gray-900">{booking.guests}</div>
                       </div>
-                      <div className={`text-center transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-6'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1600ms' : '0ms'}}>
+                      <div className="text-center">
                         <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                           <Star size={24} className="text-yellow-600" />
                         </div>
@@ -588,45 +484,22 @@ export default function TripDetailsPage({ params }) {
                 {booking.details && (
                   <>
                     {/* Hotel Accommodation */}
-                    <div 
-                      className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-8'
+                    <div
+                      id="accommodation"
+                      data-animate
+                      className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                        isVisible.accommodation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                       }`}
-                      style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1700ms' : '0ms'}}
                     >
-                      <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1800ms' : '0ms'}}>
-                        {booking.details.accommodation.title}
-                      </h3>
-                      <div className={`mb-4 transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '1900ms' : '0ms'}}>
-                        <h4 className="font-semibold text-lg mb-2">{booking.details.accommodation.nights}</h4>
+                      <h2 className="text-2xl font-bold mb-6">{booking.details.accommodation.title}</h2>
+                      <div className="mb-4">
+                        <h3 className="font-semibold text-lg mb-2">{booking.details.accommodation.nights}</h3>
                       </div>
-                      <div className={`transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '2000ms' : '0ms'}}>
-                        <h5 className="font-medium text-gray-900 mb-3">Amenities:</h5>
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3">Amenities:</h4>
                         <div className="grid md:grid-cols-2 gap-2">
                           {booking.details.accommodation.amenities.map((amenity, index) => (
-                            <div 
-                              key={index} 
-                              className={`flex items-center gap-2 transition-all duration-500 ease-out ${
-                                activeTab === 'property-details' && tabContentLoaded 
-                                  ? 'opacity-100 translate-x-0' 
-                                  : 'opacity-0 -translate-x-4'
-                              }`}
-                              style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? `${2100 + index * 100}ms` : '0ms'}}
-                            >
+                            <div key={index} className="flex items-center gap-2">
                               <CheckCircle className="text-green-500 flex-shrink-0" size={16} />
                               <span className="text-gray-700">{amenity}</span>
                             </div>
@@ -636,113 +509,59 @@ export default function TripDetailsPage({ params }) {
                     </div>
 
                     {/* Transportation */}
-                    <div 
-                      className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-8'
+                    <div
+                      id="transportation"
+                      data-animate
+                      className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                        isVisible.transportation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                       }`}
-                      style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '2700ms' : '0ms'}}
                     >
-                      <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '2800ms' : '0ms'}}>
-                        {booking.details.transportation.title}
-                      </h3>
+                      <h2 className="text-2xl font-bold mb-6">{booking.details.transportation.title}</h2>
                       <div className="space-y-4">
-                        <div className={`transition-all duration-500 ease-out ${
-                          activeTab === 'property-details' && tabContentLoaded 
-                            ? 'opacity-100 translate-y-0' 
-                            : 'opacity-0 translate-y-4'
-                        }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '2900ms' : '0ms'}}>
-                          <h4 className="font-semibold text-lg mb-2">{booking.details.transportation.flights}</h4>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-2">{booking.details.transportation.flights}</h3>
                           <div className="grid md:grid-cols-2 gap-2">
                             {booking.details.transportation.amenities.map((amenity, index) => (
-                              <div 
-                                key={index} 
-                                className={`flex items-center gap-2 transition-all duration-500 ease-out ${
-                                  activeTab === 'property-details' && tabContentLoaded 
-                                    ? 'opacity-100 translate-x-0' 
-                                    : 'opacity-0 -translate-x-4'
-                                }`}
-                                style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? `${3000 + index * 100}ms` : '0ms'}}
-                              >
+                              <div key={index} className="flex items-center gap-2">
                                 <CheckCircle className="text-blue-500 flex-shrink-0" size={16} />
                                 <span className="text-gray-700">{amenity}</span>
                               </div>
                             ))}
                           </div>
                         </div>
-                        <div className={`transition-all duration-500 ease-out ${
-                          activeTab === 'property-details' && tabContentLoaded 
-                            ? 'opacity-100 translate-y-0' 
-                            : 'opacity-0 translate-y-4'
-                        }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '3400ms' : '0ms'}}>
-                          <h5 className="font-medium text-gray-900 mb-2">Local Transportation:</h5>
+                        <div>
+                          <h4 className="font-medium text-gray-900 mb-2">Local Transportation:</h4>
                           <p className="text-gray-700">{booking.details.transportation.local}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Tour Activities */}
-                    <div 
-                      className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-8'
+                    <div
+                      id="activities"
+                      data-animate
+                      className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                        isVisible.activities ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                       }`}
-                      style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '3500ms' : '0ms'}}
                     >
-                      <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' && tabContentLoaded 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '3600ms' : '0ms'}}>
-                        {booking.details.activities.title}
-                      </h3>
+                      <h2 className="text-2xl font-bold mb-6">{booking.details.activities.title}</h2>
                       <div className="space-y-4">
-                        <div className={`transition-all duration-500 ease-out ${
-                          activeTab === 'property-details' && tabContentLoaded 
-                            ? 'opacity-100 translate-y-0' 
-                            : 'opacity-0 translate-y-4'
-                        }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '3700ms' : '0ms'}}>
-                          <h4 className="font-semibold text-lg mb-3">Included Tours & Experiences:</h4>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-3">Included Tours & Experiences:</h3>
                           <div className="space-y-2 mb-4">
                             {booking.details.activities.tours.map((tour, index) => (
-                              <div 
-                                key={index} 
-                                className={`flex items-start gap-2 transition-all duration-500 ease-out ${
-                                  activeTab === 'property-details' && tabContentLoaded 
-                                    ? 'opacity-100 translate-x-0' 
-                                    : 'opacity-0 -translate-x-4'
-                                }`}
-                                style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? `${3800 + index * 100}ms` : '0ms'}}
-                              >
+                              <div key={index} className="flex items-start gap-2">
                                 <CheckCircle className="text-purple-500 flex-shrink-0 mt-1" size={16} />
                                 <span className="text-gray-700">{tour}</span>
                               </div>
                             ))}
                           </div>
                         </div>
-                        <div className={`transition-all duration-500 ease-out ${
-                          activeTab === 'property-details' && tabContentLoaded 
-                            ? 'opacity-100 translate-y-0' 
-                            : 'opacity-0 translate-y-4'
-                        }`} style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? '4300ms' : '0ms'}}>
-                          <h5 className="font-medium text-gray-900 mb-3">Tour Amenities:</h5>
+                        <div>
+                          <h4 className="font-medium text-gray-900 mb-3">Tour Amenities:</h4>
                           <div className="grid md:grid-cols-2 gap-2">
                             {booking.details.activities.amenities.map((amenity, index) => (
-                              <div 
-                                key={index} 
-                                className={`flex items-center gap-2 transition-all duration-500 ease-out ${
-                                  activeTab === 'property-details' && tabContentLoaded 
-                                    ? 'opacity-100 translate-x-0' 
-                                    : 'opacity-0 -translate-x-4'
-                                }`}
-                                style={{transitionDelay: activeTab === 'property-details' && tabContentLoaded ? `${4400 + index * 100}ms` : '0ms'}}
-                              >
+                              <div key={index} className="flex items-center gap-2">
                                 <CheckCircle className="text-orange-500 flex-shrink-0" size={16} />
                                 <span className="text-gray-700">{amenity}</span>
                               </div>
@@ -753,32 +572,17 @@ export default function TripDetailsPage({ params }) {
                     </div>
 
                     {/* Other Inclusions */}
-                    <div 
-                      className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                        activeTab === 'property-details' 
-                          ? 'opacity-100 translate-y-0' 
-                          : 'opacity-0 translate-y-8'
+                    <div
+                      id="inclusions"
+                      data-animate
+                      className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                        isVisible.inclusions ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                       }`}
-                      style={{transitionDelay: activeTab === 'property-details' ? '2700ms' : '0ms'}}
                     >
-                      <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                        activeTab === 'property-details' 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-4'
-                      }`} style={{transitionDelay: activeTab === 'property-details' ? '2800ms' : '0ms'}}>
-                        {booking.details.inclusions.title}
-                      </h3>
+                      <h2 className="text-2xl font-bold mb-6">{booking.details.inclusions.title}</h2>
                       <div className="space-y-2">
                         {booking.details.inclusions.items.map((item, index) => (
-                          <div 
-                            key={index} 
-                            className={`flex items-start gap-2 transition-all duration-500 ease-out ${
-                              activeTab === 'property-details' 
-                                ? 'opacity-100 translate-x-0' 
-                                : 'opacity-0 -translate-x-4'
-                            }`}
-                            style={{transitionDelay: activeTab === 'property-details' ? `${2900 + index * 150}ms` : '0ms'}}
-                          >
+                          <div key={index} className="flex items-start gap-2">
                             <CheckCircle className="text-red-500 flex-shrink-0 mt-1" size={16} />
                             <span className="text-gray-700">{item}</span>
                           </div>
@@ -792,30 +596,18 @@ export default function TripDetailsPage({ params }) {
 
             {activeTab === 'daily-itinerary' && booking.type === 'upcoming' && (
               <div 
-                className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                  activeTab === 'daily-itinerary' && tabContentLoaded 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-8'
+                id="daily-itinerary"
+                data-animate
+                className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                  (isVisible['daily-itinerary'] && activeTab === 'daily-itinerary') || (activeTab === 'daily-itinerary' && tabContentLoaded) 
+                    ? "opacity-100 translate-y-0" 
+                    : "opacity-0 translate-y-10"
                 }`}
               >
-                <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                  activeTab === 'daily-itinerary' && tabContentLoaded 
-                    ? 'opacity-100 translate-x-0' 
-                    : 'opacity-0 -translate-x-4'
-                }`} style={{transitionDelay: activeTab === 'daily-itinerary' && tabContentLoaded ? '100ms' : '0ms'}}>
-                  Daily Itinerary
-                </h3>
+                <h2 className="text-2xl font-bold mb-6">Daily Itinerary</h2>
                 <div className="space-y-6">
                   {booking.itinerary.map((day, index) => (
-                    <div 
-                      key={day.day} 
-                      className={`flex gap-4 transition-all duration-500 ease-out ${
-                        activeTab === 'daily-itinerary' && tabContentLoaded 
-                          ? 'opacity-100 translate-x-0' 
-                          : 'opacity-0 -translate-x-8'
-                      }`}
-                      style={{transitionDelay: activeTab === 'daily-itinerary' && tabContentLoaded ? `${200 + index * 150}ms` : '0ms'}}
-                    >
+                    <div key={day.day} className="flex gap-4">
                       <div className="flex-shrink-0 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
                         {day.day}
                       </div>
@@ -831,26 +623,18 @@ export default function TripDetailsPage({ params }) {
 
             {activeTab === 'daily-itinerary' && booking.type === 'past' && (
               <div 
-                className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                  activeTab === 'daily-itinerary' && tabContentLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                id="trip-highlights"
+                data-animate
+                className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                  (isVisible['trip-highlights'] && activeTab === 'daily-itinerary') || (activeTab === 'daily-itinerary' && tabContentLoaded) 
+                    ? "opacity-100 translate-y-0" 
+                    : "opacity-0 translate-y-10"
                 }`}
               >
-                <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                  activeTab === 'daily-itinerary' && tabContentLoaded 
-                    ? 'opacity-100 translate-x-0' 
-                    : 'opacity-0 -translate-x-4'
-                }`} style={{transitionDelay: activeTab === 'daily-itinerary' && tabContentLoaded ? '100ms' : '0ms'}}>
-                  Trip Highlights
-                </h3>
+                <h2 className="text-2xl font-bold mb-6">Trip Highlights</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {booking.highlights.map((highlight, index) => (
-                    <div 
-                      key={index} 
-                      className={`flex items-center gap-3 py-2 transition-all duration-500 ease-out ${
-                        activeTab === 'daily-itinerary' && tabContentLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
-                      }`}
-                      style={{transitionDelay: activeTab === 'daily-itinerary' && tabContentLoaded ? `${200 + index * 100}ms` : '0ms'}}
-                    >
+                    <div key={index} className="flex items-center gap-3 py-2">
                       <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
                       <span className="text-gray-700">{highlight}</span>
                     </div>
@@ -861,25 +645,17 @@ export default function TripDetailsPage({ params }) {
 
             {activeTab === 'reviews' && (
               <div 
-                className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                  activeTab === 'reviews' && tabContentLoaded 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-8'
+                id="reviews"
+                data-animate
+                className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                  (isVisible.reviews && activeTab === 'reviews') || (activeTab === 'reviews' && tabContentLoaded) 
+                    ? "opacity-100 translate-y-0" 
+                    : "opacity-0 translate-y-10"
                 }`}
               >
-                <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                  activeTab === 'reviews' && tabContentLoaded 
-                    ? 'opacity-100 translate-x-0' 
-                    : 'opacity-0 -translate-x-4'
-                }`} style={{transitionDelay: activeTab === 'reviews' && tabContentLoaded ? '100ms' : '0ms'}}>
-                  Reviews
-                </h3>
+                <h2 className="text-2xl font-bold mb-6">Reviews</h2>
                 {booking.type === 'past' && booking.rating ? (
-                  <div className={`bg-gray-50 rounded-lg p-6 transition-all duration-500 ease-out ${
-                    activeTab === 'reviews' && tabContentLoaded 
-                      ? 'opacity-100 scale-100' 
-                      : 'opacity-0 scale-95'
-                  }`} style={{transitionDelay: activeTab === 'reviews' && tabContentLoaded ? '200ms' : '0ms'}}>
+                  <div className="bg-gray-50 rounded-lg p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="flex items-center gap-1">
                         {[...Array(Math.floor(booking.rating))].map((_, i) => (
@@ -894,11 +670,7 @@ export default function TripDetailsPage({ params }) {
                     <p className="text-gray-700 leading-relaxed">{booking.review}</p>
                   </div>
                 ) : (
-                  <div className={`text-center py-12 transition-all duration-500 ease-out ${
-                    activeTab === 'reviews' && tabContentLoaded 
-                      ? 'opacity-100 translate-y-0' 
-                      : 'opacity-0 translate-y-4'
-                  }`} style={{transitionDelay: activeTab === 'reviews' && tabContentLoaded ? '200ms' : '0ms'}}>
+                  <div className="text-center py-12">
                     <div className="text-gray-400 mb-4">
                       <Star size={48} className="mx-auto" />
                     </div>
@@ -914,59 +686,49 @@ export default function TripDetailsPage({ params }) {
             )}
 
             {activeTab === 'messages' && (
-              <div 
-                className={`py-8 border-b border-gray-200 transition-all duration-700 ease-out ${
-                  activeTab === 'messages' && tabContentLoaded 
-                    ? 'opacity-100 translate-y-0' 
-                    : 'opacity-0 translate-y-8'
-                }`}
-              >
-                <h3 className={`text-xl font-semibold mb-6 transition-all duration-500 ease-out ${
-                  activeTab === 'messages' && tabContentLoaded 
-                    ? 'opacity-100 translate-x-0' 
-                    : 'opacity-0 -translate-x-4'
-                }`} style={{transitionDelay: activeTab === 'messages' && tabContentLoaded ? '100ms' : '0ms'}}>
-                  Messages
-                </h3>
-                <div className="space-y-4">
-                  <div className={`bg-blue-50 rounded-lg p-4 transition-all duration-500 ease-out ${
-                    activeTab === 'messages' && tabContentLoaded 
-                      ? 'opacity-100 translate-x-0' 
-                      : 'opacity-0 -translate-x-8'
-                  }`} style={{transitionDelay: activeTab === 'messages' && tabContentLoaded ? '200ms' : '0ms'}}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                        H
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-gray-900">Host</span>
-                          <span className="text-xs text-gray-500">2 hours ago</span>
+              <>
+                <div 
+                  id="messages"
+                  data-animate
+                  className={`py-8 border-b border-gray-200 transition-all duration-700 ${
+                    (isVisible.messages && activeTab === 'messages') || (activeTab === 'messages' && tabContentLoaded) 
+                      ? "opacity-100 translate-y-0" 
+                      : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  <h2 className="text-2xl font-bold mb-6">Messages</h2>
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                          H
                         </div>
-                        <p className="text-gray-700">Welcome! We're excited to have you stay with us. Please let us know if you have any questions before your arrival.</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900">Host</span>
+                            <span className="text-xs text-gray-500">2 hours ago</span>
+                          </div>
+                          <p className="text-gray-700">Welcome! We're excited to have you stay with us. Please let us know if you have any questions before your arrival.</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className={`bg-gray-50 rounded-lg p-4 transition-all duration-500 ease-out ${
-                    activeTab === 'messages' && tabContentLoaded 
-                      ? 'opacity-100 translate-x-0' 
-                      : 'opacity-0 -translate-x-8'
-                  }`} style={{transitionDelay: activeTab === 'messages' && tabContentLoaded ? '300ms' : '0ms'}}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                        S
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-gray-900">Support Team</span>
-                          <span className="text-xs text-gray-500">1 day ago</span>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                          S
                         </div>
-                        <p className="text-gray-700">Your booking has been confirmed! Check your email for detailed information about your trip.</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900">Support Team</span>
+                            <span className="text-xs text-gray-500">1 day ago</span>
+                          </div>
+                          <p className="text-gray-700">Your booking has been confirmed! Check your email for detailed information about your trip.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
 

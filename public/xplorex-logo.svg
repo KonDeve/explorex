@@ -1,0 +1,10 @@
+<svg viewBox="0 0 1489 427" xmlns="http://www.w3.org/2000/svg">
+  <!-- Xplorex text in black -->
+  <text x="20" y="300" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#000">xplorex</text>
+  
+  <!-- Blue arrow/travel symbol -->
+  <path d="M1220 50 L1320 150 L1220 250 L1270 200 L1400 200 L1450 150 L1400 100 L1270 100 Z" fill="#1E90FF" />
+  
+  <!-- TRAVEL AND TOURS text in blue -->
+  <text x="465" y="380" font-family="Arial, sans-serif" font-size="45" font-weight="normal" fill="#1E90FF" letter-spacing="8">TRAVEL AND TOURS</text>
+</svg>
