@@ -1,17 +1,20 @@
 "use client"
 
 import Header from "@/components/header"
-import { Calendar, MapPin, CreditCard, User, Settings, LogOut, Package, LayoutGrid, Table } from "lucide-react"
+import { Calendar, MapPin, CreditCard, User, Settings, LogOut, Package, LayoutGrid, Table, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/AuthContext"
 import { useRouter } from "next/navigation"
+import { getUserBookings } from "@/lib/bookings"
 
 export default function CustomerDashboard() {
   const router = useRouter()
   const { user, profile, isAuthenticated, loading } = useAuth()
   const [viewMode, setViewMode] = useState("card")
   const [isVisible, setIsVisible] = useState({})
+  const [bookings, setBookings] = useState([])
+  const [loadingBookings, setLoadingBookings] = useState(true)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -19,6 +22,29 @@ export default function CustomerDashboard() {
       router.push('/login')
     }
   }, [loading, isAuthenticated, router])
+
+  // Fetch user bookings
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (user) {
+        setLoadingBookings(true)
+        try {
+          const result = await getUserBookings(user.id)
+          if (result.success) {
+            setBookings(result.bookings)
+          } else {
+            console.error('Failed to fetch bookings:', result.error)
+          }
+        } catch (err) {
+          console.error('Error fetching bookings:', err)
+        } finally {
+          setLoadingBookings(false)
+        }
+      }
+    }
+
+    fetchBookings()
+  }, [user])
 
   // Get first name for welcome message
   const firstName = profile?.first_name || "User"
@@ -50,42 +76,28 @@ export default function CustomerDashboard() {
     return () => observer.disconnect()
   }, [])
 
-  const upcomingBookings = [
-    {
-      id: "BK-001",
-      package: "Santorini Paradise",
-      location: "Greece",
-      checkIn: "2025-06-15",
-      checkOut: "2025-06-22",
-      guests: "2 Adults",
-      image: "/santorini-blue-domes-greece.jpg",
-      status: "confirmed"
-    },
-    {
-      id: "BK-003",
-      package: "Alpine Adventure",
-      location: "Switzerland",
-      checkIn: "2025-08-10",
-      checkOut: "2025-08-16",
-      guests: "4 Adults",
-      image: "/mountain-lake-sunset-alps.jpg",
-      status: "confirmed"
-    },
-  ]
+  // Separate upcoming and past bookings
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-  const pastBookings = [
-    {
-      id: "BK-000",
-      package: "Venice Romance",
-      location: "Italy",
-      date: "2024-12-10",
-      image: "/venice-italy-canal-buildings.jpg"
-    },
-  ]
+  const upcomingBookings = bookings.filter(booking => {
+    const checkInDate = new Date(booking.check_in_date)
+    return checkInDate >= today && booking.status !== 'cancelled'
+  })
+
+  const pastBookings = bookings.filter(booking => {
+    const checkOutDate = new Date(booking.check_out_date)
+    return checkOutDate < today || booking.status === 'cancelled' || booking.status === 'completed'
+  })
+
+  // Calculate stats
+  const totalSpent = bookings.reduce((sum, booking) => sum + (booking.total_amount || 0), 0)
+  const placesVisited = pastBookings.filter(b => b.status === 'completed').length
 
   const handleViewDetails = (booking) => {
-    // Navigate to trip details page
-    window.location.href = `/dashboard/trip/${booking.id}`
+    // Navigate to trip details page using slug
+    const slug = booking.package?.slug || booking.id
+    window.location.href = `/dashboard/trip/${slug}`
   }
 
   return (
@@ -168,7 +180,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Upcoming Trips</div>
-                    <div className="text-2xl font-bold text-gray-900">2</div>
+                    <div className="text-2xl font-bold text-gray-900">{upcomingBookings.length}</div>
                   </div>
                 </div>
               </div>
@@ -179,7 +191,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Places Visited</div>
-                    <div className="text-2xl font-bold text-gray-900">3</div>
+                    <div className="text-2xl font-bold text-gray-900">{placesVisited}</div>
                   </div>
                 </div>
               </div>
@@ -190,7 +202,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Total Spent</div>
-                    <div className="text-2xl font-bold text-gray-900">$7,497</div>
+                    <div className="text-2xl font-bold text-gray-900">₱{totalSpent.toLocaleString()}</div>
                   </div>
                 </div>
               </div>
@@ -228,76 +240,109 @@ export default function CustomerDashboard() {
                 </div>
               </div>
 
-              {viewMode === "card" ? (
+              {loadingBookings ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                  <Loader2 className="animate-spin mx-auto text-blue-500 mb-4" size={48} />
+                  <p className="text-gray-600 text-lg">Loading your bookings...</p>
+                </div>
+              ) : upcomingBookings.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                  <Calendar className="mx-auto text-gray-300 mb-4" size={64} />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No upcoming trips</h3>
+                  <p className="text-gray-500 mb-6">Start planning your next adventure!</p>
+                  <Link href="/packages" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    Browse Packages
+                  </Link>
+                </div>
+              ) : viewMode === "card" ? (
                 <div className="space-y-6">
-                  {upcomingBookings.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition"
-                    >
-                      <div className="grid md:grid-cols-[280px_1fr] gap-0">
-                        <div className="relative h-full overflow-hidden">
-                          <img
-                            src={booking.image || "/placeholder.svg"}
-                            alt={booking.package}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute top-4 left-4">
-                            <span className="bg-orange-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold">
-                              Partial Payment
-                            </span>
+                  {upcomingBookings.map((booking) => {
+                    const packageData = booking.package || {}
+                    const bookingImage = packageData.images?.[0] || "/placeholder.svg"
+                    const bookingDate = new Date(booking.booking_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                    const remainingBalance = booking.remaining_balance || 0
+                    
+                    return (
+                      <div
+                        key={booking.id}
+                        className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition"
+                      >
+                        <div className="grid md:grid-cols-[280px_1fr] gap-0">
+                          <div className="relative h-full overflow-hidden">
+                            <img
+                              src={bookingImage}
+                              alt={packageData.title}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-4 left-4">
+                              <span className={`px-4 py-1.5 rounded-md text-sm font-semibold ${
+                                booking.status === 'confirmed' ? 'bg-green-500 text-white' :
+                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                'bg-gray-500 text-white'
+                              }`}>
+                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              </span>
+                            </div>
+                            {remainingBalance > 0 && (
+                              <div className="absolute top-14 left-4">
+                                <span className="bg-orange-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold">
+                                  Partial Payment
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="p-6">
-                          <div className="flex items-start justify-between mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">{booking.package}</h3>
-                            <div className="text-sm text-gray-500">Booking ID: {booking.id}</div>
-                          </div>
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-6">
+                              <h3 className="text-2xl font-bold text-gray-900">{packageData.title}</h3>
+                              <div className="text-sm text-gray-500">Booking ID: {booking.booking_number}</div>
+                            </div>
 
-                          <div className="grid grid-cols-2 gap-6 mb-6">
-                            <div className="flex items-start gap-3">
-                              <Calendar size={20} className="text-gray-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-500 mb-1">Travel Date</div>
-                                <div className="text-sm text-gray-900">{booking.checkIn} - {booking.checkOut}</div>
+                            <div className="grid grid-cols-2 gap-6 mb-6">
+                              <div className="flex items-start gap-3">
+                                <Calendar size={20} className="text-gray-400 mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-500 mb-1">Travel Date</div>
+                                  <div className="text-sm text-gray-900">{booking.check_in_date} - {booking.check_out_date}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <MapPin size={20} className="text-gray-400 mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-500 mb-1">Destination</div>
+                                  <div className="text-sm text-gray-900">{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <User size={20} className="text-gray-400 mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-500 mb-1">Travellers</div>
+                                  <div className="text-sm text-gray-900">{booking.total_guests}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <Calendar size={20} className="text-gray-400 mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-500 mb-1">Booked On</div>
+                                  <div className="text-sm text-gray-900">{bookingDate}</div>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-start gap-3">
-                              <MapPin size={20} className="text-gray-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-500 mb-1">Destination</div>
-                                <div className="text-sm text-gray-900">{booking.location}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <User size={20} className="text-gray-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-500 mb-1">Travellers</div>
-                                <div className="text-sm text-gray-900">{booking.guests}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <Calendar size={20} className="text-gray-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-500 mb-1">Booked On</div>
-                                <div className="text-sm text-gray-900">February 6, 2026</div>
-                              </div>
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-200">
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">Total Package</div>
-                              <div className="text-lg font-bold text-gray-900">₱50,000</div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">Amount Paid</div>
-                              <div className="text-lg font-bold text-green-600">₱25,000</div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">Remaining Balance</div>
-                              <div className="text-lg font-bold text-orange-600">₱25,000</div>
-                              <div className="text-xs text-gray-400">Due: 2/23/26</div>
+                            <div className="grid grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-200">
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Total Package</div>
+                                <div className="text-lg font-bold text-gray-900">₱{booking.total_amount.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Amount Paid</div>
+                                <div className="text-lg font-bold text-green-600">₱{booking.amount_paid.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Remaining Balance</div>
+                                <div className="text-lg font-bold text-orange-600">₱{remainingBalance.toLocaleString()}</div>
+                                {booking.payment_due_date && (
+                                  <div className="text-xs text-gray-400">Due: {new Date(booking.payment_due_date).toLocaleDateString()}</div>
+                                )}
                             </div>
                           </div>
 
@@ -316,7 +361,8 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )
+                })}
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -335,33 +381,41 @@ export default function CustomerDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {upcomingBookings.map((booking) => (
-                          <tr key={booking.id} className="hover:bg-gray-50 transition">
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{booking.id}</td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={booking.image || "/placeholder.svg"}
-                                  alt={booking.package}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                                <span className="font-semibold text-gray-900">{booking.package}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <MapPin size={16} />
-                                <span>{booking.location}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{booking.checkIn}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{booking.checkOut}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{booking.guests}</td>
-                            <td className="px-6 py-4">
-                              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                {booking.status}
-                              </span>
-                            </td>
+                        {upcomingBookings.map((booking) => {
+                          const packageData = booking.package || {}
+                          const bookingImage = packageData.images?.[0] || "/placeholder.svg"
+                          
+                          return (
+                            <tr key={booking.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{booking.booking_number}</td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={bookingImage}
+                                    alt={packageData.title}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                  <span className="font-semibold text-gray-900">{packageData.title}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <MapPin size={16} />
+                                  <span>{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{booking.check_in_date}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{booking.check_out_date}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{booking.total_guests}</td>
+                              <td className="px-6 py-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                                  booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {booking.status}
+                                </span>
+                              </td>
                             <td className="px-6 py-4">
                               <div className="flex gap-2">
                                 <button 
@@ -376,7 +430,8 @@ export default function CustomerDashboard() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                        )
+                      })}
                       </tbody>
                     </table>
                   </div>

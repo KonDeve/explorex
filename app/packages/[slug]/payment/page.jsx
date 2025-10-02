@@ -1,8 +1,9 @@
 "use client"
 
-import { ArrowLeft, CreditCard, Lock, Check, Calendar, MapPin, Users } from "lucide-react"
+import { ArrowLeft, CreditCard, Lock, Check, Calendar, MapPin, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { getPackageBySlug } from "@/lib/packages"
 
 export default function PaymentPage({ params }) {
   const [paymentMethod, setPaymentMethod] = useState("card")
@@ -13,20 +14,55 @@ export default function PaymentPage({ params }) {
     cvv: "",
     saveCard: false,
   })
+  const [packageData, setPackageData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Package data
-  const packages = {
-    1: {
-      id: 1,
-      title: "Santorini Paradise",
-      location: "Greece",
-      duration: "7 Days",
-      price: 2499,
-      image: "/santorini-blue-domes-greece.jpg",
-    },
+  // Fetch package data
+  useEffect(() => {
+    const fetchPackage = async () => {
+      try {
+        setLoading(true)
+        const data = await getPackageBySlug(params.slug)
+        setPackageData(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching package:', err)
+        setError('Failed to load package details')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (params.slug) {
+      fetchPackage()
+    }
+  }, [params.slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500" size={48} />
+        <span className="ml-3 text-gray-600 text-lg">Loading payment details...</span>
+      </div>
+    )
   }
 
-  const pkg = packages[params.id] || packages[1]
+  if (error || !packageData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-lg mb-4">{error || 'Package not found'}</p>
+          <Link href="/packages" className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition inline-block">
+            Back to Packages
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const pkg = packageData
+  // Get booking details from sessionStorage or use defaults
   const bookingDetails = {
     adults: 2,
     children: 0,
@@ -35,14 +71,16 @@ export default function PaymentPage({ params }) {
   }
 
   const calculateTotal = () => {
-    const basePrice = pkg.price * bookingDetails.adults
+    const priceValue = pkg.price_value || 0
+    const basePrice = priceValue * bookingDetails.adults
+    const childPrice = priceValue * 0.5 * bookingDetails.children
     const serviceFee = 99
-    const taxes = basePrice * 0.1
+    const taxes = (basePrice + childPrice) * 0.1
     return {
-      subtotal: basePrice,
+      subtotal: basePrice + childPrice,
       serviceFee,
       taxes,
-      total: basePrice + serviceFee + taxes,
+      total: basePrice + childPrice + serviceFee + taxes,
     }
   }
 
@@ -78,7 +116,7 @@ export default function PaymentPage({ params }) {
       {/* Back Button */}
       <div className="container mx-auto px-4 py-6">
         <Link
-          href={`/packages/${params.id}/book`}
+          href={`/packages/${params.slug}/book`}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
         >
           <ArrowLeft size={20} />
@@ -226,7 +264,7 @@ export default function PaymentPage({ params }) {
                   type="submit"
                   className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition font-bold text-lg"
                 >
-                  Pay ${totals.total.toLocaleString()} Now
+                  Pay ₱{totals.total.toLocaleString()} Now
                 </button>
 
                 <p className="text-sm text-gray-500 text-center">
@@ -243,7 +281,11 @@ export default function PaymentPage({ params }) {
 
               {/* Package Image */}
               <div className="rounded-xl overflow-hidden mb-6">
-                <img src={pkg.image || "/placeholder.svg"} alt={pkg.title} className="w-full h-48 object-cover" />
+                <img 
+                  src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg"} 
+                  alt={pkg.title} 
+                  className="w-full h-48 object-cover" 
+                />
               </div>
 
               {/* Package Details */}
@@ -251,7 +293,7 @@ export default function PaymentPage({ params }) {
                 <h3 className="font-bold text-lg">{pkg.title}</h3>
                 <div className="flex items-center gap-2 text-gray-600 text-sm">
                   <MapPin size={16} />
-                  <span>{pkg.location}</span>
+                  <span>{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-600 text-sm">
                   <Calendar size={16} />
@@ -261,7 +303,8 @@ export default function PaymentPage({ params }) {
                 </div>
                 <div className="flex items-center gap-2 text-gray-600 text-sm">
                   <Users size={16} />
-                  <span>{bookingDetails.adults} Adults</span>
+                  <span>{bookingDetails.adults} Adult{bookingDetails.adults !== 1 ? "s" : ""}</span>
+                  {bookingDetails.children > 0 && <span>, {bookingDetails.children} Child{bookingDetails.children !== 1 ? "ren" : ""}</span>}
                 </div>
               </div>
 
@@ -269,22 +312,31 @@ export default function PaymentPage({ params }) {
               <div className="border-t border-gray-200 pt-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
-                    ${pkg.price.toLocaleString()} × {bookingDetails.adults} adult
+                    ₱{pkg.price_value?.toLocaleString()} × {bookingDetails.adults} adult
                     {bookingDetails.adults !== 1 ? "s" : ""}
                   </span>
-                  <span className="font-semibold">${totals.subtotal.toLocaleString()}</span>
+                  <span className="font-semibold">₱{(pkg.price_value * bookingDetails.adults).toLocaleString()}</span>
                 </div>
+                {bookingDetails.children > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      ₱{(pkg.price_value * 0.5).toLocaleString()} × {bookingDetails.children} child
+                      {bookingDetails.children !== 1 ? "ren" : ""}
+                    </span>
+                    <span className="font-semibold">₱{(pkg.price_value * 0.5 * bookingDetails.children).toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Service fee</span>
-                  <span className="font-semibold">${totals.serviceFee}</span>
+                  <span className="font-semibold">₱{totals.serviceFee}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Taxes (10%)</span>
-                  <span className="font-semibold">${totals.taxes.toFixed(2)}</span>
+                  <span className="font-semibold">₱{totals.taxes.toFixed(2)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between">
                   <span className="font-bold text-lg">Total</span>
-                  <span className="font-bold text-2xl text-blue-500">${totals.total.toLocaleString()}</span>
+                  <span className="font-bold text-2xl text-blue-500">₱{totals.total.toLocaleString()}</span>
                 </div>
               </div>
 

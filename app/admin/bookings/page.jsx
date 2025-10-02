@@ -1,80 +1,83 @@
 "use client"
 
-import { Search, Filter, Download, Eye, Check, X, Grid, List } from "lucide-react"
-import { useState } from "react"
+import { Search, Filter, Download, Eye, Check, X, Grid, List, RefreshCw } from "lucide-react"
+import { useState, useEffect } from "react"
+import { getAllBookings, updateBookingStatus, updatePaymentStatus } from "@/lib/bookings"
 
 export default function AdminBookings() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [viewMode, setViewMode] = useState("list") // Added view mode toggle
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(null)
 
-  const bookings = [
-    {
-      id: "BK-001",
-      customer: "John Doe",
-      email: "john.doe@email.com",
-      package: "Santorini Paradise",
-      checkIn: "2025-06-15",
-      checkOut: "2025-06-22",
-      guests: "2 Adults",
-      amount: "$2,499",
-      status: "confirmed",
-      paymentStatus: "paid",
-      bookingDate: "2025-01-15",
-    },
-    {
-      id: "BK-002",
-      customer: "Jane Smith",
-      email: "jane.smith@email.com",
-      package: "Venice Romance",
-      checkIn: "2025-07-20",
-      checkOut: "2025-07-25",
-      guests: "2 Adults",
-      amount: "$1,899",
-      status: "pending",
-      paymentStatus: "pending",
-      bookingDate: "2025-01-16",
-    },
-    {
-      id: "BK-003",
-      customer: "Mike Johnson",
-      email: "mike.j@email.com",
-      package: "Alpine Adventure",
-      checkIn: "2025-08-10",
-      checkOut: "2025-08-16",
-      guests: "4 Adults",
-      amount: "$2,799",
-      status: "confirmed",
-      paymentStatus: "paid",
-      bookingDate: "2025-01-17",
-    },
-    {
-      id: "BK-004",
-      customer: "Sarah Williams",
-      email: "sarah.w@email.com",
-      package: "Tropical Escape",
-      checkIn: "2025-09-05",
-      checkOut: "2025-09-13",
-      guests: "2 Adults",
-      amount: "$3,299",
-      status: "confirmed",
-      paymentStatus: "paid",
-      bookingDate: "2025-01-18",
-    },
-    {
-      id: "BK-005",
-      customer: "David Brown",
-      email: "david.b@email.com",
-      package: "Greek Islands Tour",
-      checkIn: "2025-10-12",
-      checkOut: "2025-10-22",
-      guests: "6 Adults",
-      amount: "$2,199",
-      status: "pending",
-      paymentStatus: "pending",
-      bookingDate: "2025-01-19",
-    },
-  ]
+  // Fetch bookings
+  useEffect(() => {
+    fetchBookings()
+  }, [])
+
+  const fetchBookings = async () => {
+    setLoading(true)
+    try {
+      const result = await getAllBookings()
+      if (result.success) {
+        setBookings(result.bookings)
+      } else {
+        console.error('Failed to fetch bookings:', result.error)
+      }
+    } catch (err) {
+      console.error('Error fetching bookings:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Update booking status
+  const handleStatusUpdate = async (bookingId, newStatus) => {
+    if (!confirm(`Are you sure you want to change the status to "${newStatus}"?`)) {
+      return
+    }
+
+    setUpdating(bookingId)
+    try {
+      const result = await updateBookingStatus(bookingId, newStatus)
+      if (result.success) {
+        alert('Booking status updated successfully!')
+        await fetchBookings() // Refresh the list
+      } else {
+        alert(`Failed to update status: ${result.error}`)
+      }
+    } catch (err) {
+      console.error('Error updating status:', err)
+      alert('An error occurred while updating the status')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  // Update payment status
+  const handlePaymentStatusUpdate = async (bookingId, newPaymentStatus) => {
+    if (!confirm(`Are you sure you want to change the payment status to "${newPaymentStatus}"?`)) {
+      return
+    }
+
+    setUpdating(bookingId)
+    try {
+      const result = await updatePaymentStatus(bookingId, newPaymentStatus)
+      if (result.success) {
+        alert('Payment status updated successfully!')
+        await fetchBookings() // Refresh the list
+      } else {
+        alert(`Failed to update payment status: ${result.error}`)
+      }
+    } catch (err) {
+      console.error('Error updating payment status:', err)
+      alert('An error occurred while updating the payment status')
+    } finally {
+      setUpdating(null)
+    }
+  }
 
   const filteredBookings =
     filterStatus === "all" ? bookings : bookings.filter((booking) => booking.status === filterStatus)
@@ -88,10 +91,20 @@ export default function AdminBookings() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Booking Management</h1>
             <p className="text-gray-600">View and manage all customer bookings</p>
           </div>
-          <button className="mt-4 md:mt-0 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold">
-            <Download size={20} />
-            Export Report
-          </button>
+          <div className="flex gap-3 mt-4 md:mt-0">
+            <button 
+              onClick={fetchBookings}
+              disabled={loading}
+              className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition flex items-center gap-2 font-semibold disabled:opacity-50"
+            >
+              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold">
+              <Download size={20} />
+              Export Report
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -114,7 +127,9 @@ export default function AdminBookings() {
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="text-sm text-gray-600 mb-1">Total Revenue</div>
-            <div className="text-3xl font-bold text-blue-600">$13,495</div>
+            <div className="text-3xl font-bold text-blue-600">
+              ₱{bookings.reduce((sum, b) => sum + (b.total_amount || 0), 0).toLocaleString()}
+            </div>
           </div>
         </div>
 
@@ -162,7 +177,12 @@ export default function AdminBookings() {
           </div>
         </div>
 
-        {viewMode === "list" ? (
+        {loading ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <RefreshCw className="animate-spin mx-auto text-blue-500 mb-4" size={48} />
+            <p className="text-gray-600 text-lg">Loading bookings...</p>
+          </div>
+        ) : viewMode === "list" ? (
           // Table View
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -180,67 +200,112 @@ export default function AdminBookings() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBookings.map((booking) => (
-                    <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                      <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-900">{booking.id}</div>
-                        <div className="text-xs text-gray-500">{booking.bookingDate}</div>
+                  {filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-12 text-center">
+                        <div className="text-gray-400 text-lg">No bookings found</div>
+                        <p className="text-gray-500 text-sm mt-2">Bookings will appear here when customers make reservations</p>
                       </td>
-                      <td className="py-4 px-6">
-                        <div className="font-medium text-gray-900">{booking.customer}</div>
-                        <div className="text-sm text-gray-500">{booking.email}</div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="font-medium text-gray-900">{booking.package}</div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="text-sm text-gray-600">
-                          {booking.checkIn} to {booking.checkOut}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="text-sm text-gray-600">{booking.guests}</div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-900">{booking.amount}</div>
-                        <div
-                          className={`text-xs ${booking.paymentStatus === "paid" ? "text-green-600" : "text-yellow-600"}`}
-                        >
-                          {booking.paymentStatus}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                            booking.status === "confirmed"
-                              ? "bg-green-100 text-green-700"
-                              : booking.status === "pending"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {booking.status}
-                        </span>
-                      </td>
+                    </tr>
+                  ) : (
+                    filteredBookings.map((booking) => {
+                    const bookingNumber = booking.booking_number
+                    const bookingDate = new Date(booking.booking_date).toLocaleDateString()
+                    const customerName = `${booking.customer_first_name} ${booking.customer_last_name}`
+                    const customerEmail = booking.customer_email
+                    const packageTitle = booking.package?.title || 'N/A'
+                    const checkIn = booking.check_in_date
+                    const checkOut = booking.check_out_date
+                    const guests = booking.total_guests
+                    const amount = `₱${booking.total_amount.toLocaleString()}`
+                    const paymentStatus = booking.payment_status
+
+                    return (
+                      <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="py-4 px-6">
+                          <div className="font-semibold text-gray-900">{bookingNumber}</div>
+                          <div className="text-xs text-gray-500">{bookingDate}</div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-medium text-gray-900">{customerName}</div>
+                          <div className="text-sm text-gray-500">{customerEmail}</div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-medium text-gray-900">{packageTitle}</div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="text-sm text-gray-600">
+                            {checkIn} to {checkOut}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="text-sm text-gray-600">{guests}</div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-semibold text-gray-900">{amount}</div>
+                          <div
+                            className={`text-xs ${paymentStatus === "paid" ? "text-green-600" : "text-yellow-600"}`}
+                          >
+                            {paymentStatus}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span
+                            className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                              booking.status === "confirmed"
+                                ? "bg-green-100 text-green-700"
+                                : booking.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {booking.status}
+                          </span>
+                        </td>
                       <td className="py-4 px-6">
                         <div className="flex gap-2">
-                          <button className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">
+                          <button 
+                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"
+                            title="View Details"
+                          >
                             <Eye size={16} />
                           </button>
                           {booking.status === "pending" && (
                             <>
-                              <button className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition">
-                                <Check size={16} />
+                              <button 
+                                onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                                disabled={updating === booking.id}
+                                className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition disabled:opacity-50"
+                                title="Confirm Booking"
+                              >
+                                {updating === booking.id ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
                               </button>
-                              <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition">
+                              <button 
+                                onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                                disabled={updating === booking.id}
+                                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
+                                title="Cancel Booking"
+                              >
                                 <X size={16} />
                               </button>
                             </>
                           )}
+                          {booking.status === "confirmed" && booking.payment_status === "pending" && (
+                            <button 
+                              onClick={() => handlePaymentStatusUpdate(booking.id, 'paid')}
+                              disabled={updating === booking.id}
+                              className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition disabled:opacity-50 text-xs"
+                              title="Mark as Paid"
+                            >
+                              💳
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )
+                })
+              )}
                 </tbody>
               </table>
             </div>

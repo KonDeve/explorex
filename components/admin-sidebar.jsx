@@ -3,9 +3,26 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Calendar, Users, FileText, LogOut, Settings, Home } from "lucide-react"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function AdminSidebar({ isOpen, onClose }) {
   const pathname = usePathname()
+  const { user, profile } = useAuth()
+
+  // Get user display name and initials
+  const displayName = profile?.first_name && profile?.last_name 
+    ? `${profile.first_name} ${profile.last_name}` 
+    : user?.email?.split('@')[0] || "Admin User"
+  
+  const getInitials = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+    }
+    if (profile?.first_name) {
+      return profile.first_name.substring(0, 2).toUpperCase()
+    }
+    return "A"
+  }
 
   const navLinks = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -52,12 +69,20 @@ export default function AdminSidebar({ isOpen, onClose }) {
           {/* User Profile */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                A
-              </div>
+              {profile?.profile_image_url ? (
+                <img
+                  src={profile.profile_image_url}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-200"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                  {getInitials()}
+                </div>
+              )}
               <div className="flex-1">
-                <div className="text-sm font-semibold text-gray-900">Admin User</div>
-                <div className="text-xs text-gray-500">admin@xplorex.com</div>
+                <div className="text-sm font-semibold text-gray-900">{displayName}</div>
+                <div className="text-xs text-gray-500">{user?.email || "admin@xplorex.com"}</div>
               </div>
             </div>
 
@@ -128,12 +153,20 @@ export default function AdminSidebar({ isOpen, onClose }) {
           {/* User Profile */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                A
-              </div>
+              {profile?.profile_image_url ? (
+                <img
+                  src={profile.profile_image_url}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-200"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                  {getInitials()}
+                </div>
+              )}
               <div className="flex-1">
-                <div className="text-sm font-semibold text-gray-900">Admin User</div>
-                <div className="text-xs text-gray-500">admin@xplorex.com</div>
+                <div className="text-sm font-semibold text-gray-900">{displayName}</div>
+                <div className="text-xs text-gray-500">{user?.email || "admin@xplorex.com"}</div>
               </div>
             </div>
 

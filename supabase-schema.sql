@@ -34,9 +34,11 @@ CREATE TABLE packages (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     location VARCHAR(255) NOT NULL,
+    country VARCHAR(100),
     duration VARCHAR(100) NOT NULL,
-    price DECIMAL(10,2) NOT NULL,
-    max_guests INTEGER NOT NULL,
+    people VARCHAR(50), -- e.g., "2-4 People"
+    price VARCHAR(50) NOT NULL, -- Formatted price like "$2,499"
+    price_value DECIMAL(10,2) NOT NULL, -- Numeric value for calculations
     rating DECIMAL(3,2) DEFAULT 0.00,
     reviews_count INTEGER DEFAULT 0,
     description TEXT,
@@ -45,6 +47,9 @@ CREATE TABLE packages (
     highlights TEXT,
     features JSONB, -- Array of features like ["5-Star Hotel", "All Meals", "Tour Guide"]
     images JSONB, -- Array of image URLs
+    popular BOOLEAN DEFAULT FALSE,
+    featured BOOLEAN DEFAULT FALSE,
+    hero_type VARCHAR(50), -- e.g., "beach", "mountain", "city"
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -57,13 +62,11 @@ CREATE TABLE package_details (
     package_id UUID REFERENCES packages(id) ON DELETE CASCADE,
     section_type VARCHAR(50) NOT NULL, -- 'accommodation', 'transportation', 'activities', 'inclusions'
     title VARCHAR(255) NOT NULL,
-    description TEXT,
+    description TEXT, -- Section description (e.g., "4 nights stay at Hotel Danieli Venice")
     amenities JSONB, -- Array of amenities
+    local TEXT, -- For transportation section - local transportation info
     tours JSONB, -- Array of tour activities (for activities section)
     items JSONB, -- Array of inclusion items (for inclusions section)
-    flights_info TEXT, -- For transportation section
-    local_transport TEXT, -- For transportation section
-    nights_info TEXT, -- For accommodation section
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -521,37 +524,44 @@ INSERT INTO users (email, password_hash, first_name, last_name, role)
 VALUES ('admin@xplorex.com', '$2b$10$example_hash', 'Admin', 'User', 'admin');
 
 -- Insert sample packages
-INSERT INTO packages (id, title, location, duration, price, max_guests, rating, reviews_count, description, category, features, images) VALUES
+INSERT INTO packages (id, title, location, country, duration, people, price, price_value, rating, reviews_count, description, category, features, images, popular, featured, hero_type) VALUES
 (
     '550e8400-e29b-41d4-a716-446655440001',
     'Santorini Paradise',
     'Greece',
-    '7 Days, 6 Nights',
+    'GREECE',
+    '7 Days',
+    '2-4 People',
+    '$2,499',
     2499.00,
-    4,
     4.9,
     342,
     'Experience the magic of Santorini with its iconic blue-domed churches, stunning sunsets, and pristine beaches. This comprehensive package includes luxury accommodation, guided tours, and authentic Greek dining experiences.',
-    'Beach',
-    '["5-Star Hotel", "All Meals Included", "Airport Transfer", "Tour Guide", "Spa Access"]',
-    '["/santorini-blue-domes-greece.jpg", "/santorini-greece-infinity-pool-ocean.jpg", "/white-greek-buildings-blue-doors.jpg"]'
+    'International',
+    '["5-Star Hotel", "All Meals", "Tour Guide", "Transportation"]',
+    '["/santorini-blue-domes-greece.jpg", "/santorini-greece-infinity-pool-ocean.jpg", "/white-greek-buildings-blue-doors.jpg"]',
+    TRUE,
+    TRUE,
+    'beach'
 ),
 (
     '550e8400-e29b-41d4-a716-446655440002',
     'Venice Romance',
     'Italy',
-    '5 Days, 4 Nights',
+    'ITALY',
+    '5 Days',
+    '2 People',
+    '$1,899',
     1899.00,
-    2,
     4.8,
     256,
     'Discover the romantic charm of Venice with its winding canals, historic architecture, and world-class art. Perfect for couples seeking an unforgettable Italian getaway.',
-    'Giovanni Rossi',
-    'Italian Escapes',
-    'Veneto Region',
     'Cultural',
     '["4-Star Hotel", "Breakfast", "Gondola Ride", "City Tours"]',
-    '["/venice-italy-canal-buildings.jpg"]'
+    '["/venice-italy-canal-buildings.jpg"]',
+    TRUE,
+    FALSE,
+    'city'
 );
 
 -- =============================================
@@ -560,37 +570,35 @@ INSERT INTO packages (id, title, location, duration, price, max_guests, rating, 
 
 -- Insert sample package details for Santorini Paradise
 -- Accommodation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, nights_info) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440001',
     'accommodation',
     'Hotel Accommodation',
     '6 nights stay at Santorini Blue Resort (Premium Suite)',
-    '["Free Wi-Fi", "Private balcony with caldera view", "Daily breakfast", "Infinity pool access", "Concierge service", "Airport transfers"]',
-    '6 nights stay at Santorini Blue Resort (Premium Suite)'
+    '["Free Wi-Fi", "Private balcony with caldera view", "Daily breakfast", "Infinity pool access", "Concierge service", "Airport transfers"]'
 );
 
 -- Transportation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, flights_info, local_transport) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities, local) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440001',
     'transportation',
     'Transportation',
     'Round-trip flights from major cities to Santorini',
     '["Premium economy seating", "In-flight meals", "Airport lounge access", "Travel insurance"]',
-    'Round-trip flights from major cities to Santorini',
     'Private transfers and local transportation for all tour activities'
 );
 
 -- Activities section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, tours) 
+INSERT INTO package_details (package_id, section_type, title, description, tours, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440001',
     'activities',
     'Tour Activities',
-    'Included Tours & Experiences',
-    '["Professional tour guide", "All entrance fees included", "Photography sessions", "Traditional Greek lunch", "Bottled water and snacks"]',
-    '["Oia Village sunset tour", "Wine tasting at traditional wineries", "Caldera boat cruise", "Red Beach and Kamari Beach visits", "Fira town exploration"]'
+    'Included tours & experiences exploring Santorini highlights',
+    '["Oia Village sunset tour", "Wine tasting at traditional wineries", "Caldera boat cruise", "Red Beach and Kamari Beach visits", "Fira town exploration"]',
+    '["Professional tour guide", "All entrance fees included", "Photography sessions", "Traditional Greek lunch", "Bottled water and snacks"]'
 );
 
 -- Inclusions section
@@ -599,43 +607,41 @@ VALUES (
     '550e8400-e29b-41d4-a716-446655440001',
     'inclusions',
     'Other Inclusions',
-    'Additional services and amenities included in your package',
+    'Extra benefits and travel essentials for your Santorini trip',
     '["Comprehensive travel insurance for 7 days", "Free welcome dinner with live music", "Souvenir shopping voucher worth $100", "24/7 customer support"]'
 );
 
 -- Insert sample package details for Venice Romance
 -- Accommodation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, nights_info) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440002',
     'accommodation',
     'Hotel Accommodation',
     '4 nights stay at Hotel Danieli Venice (Canal View Room)',
-    '["Free Wi-Fi", "Canal view balcony", "Continental breakfast", "Room service", "Historic palazzo setting", "24-hour front desk"]',
-    '4 nights stay at Hotel Danieli Venice (Canal View Room)'
+    '["Free Wi-Fi", "Canal view balcony", "Continental breakfast", "Room service", "Historic palazzo setting", "24-hour front desk"]'
 );
 
 -- Transportation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, flights_info, local_transport) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities, local) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440002',
     'transportation',
     'Transportation',
     'Round-trip flights to Venice Marco Polo Airport',
     '["Economy plus seating", "Checked baggage included", "Airport transfers via water taxi"]',
-    'Round-trip flights to Venice Marco Polo Airport',
-    'Vaporetto passes for Venice public water transport and walking tours'
+    'Vaporetto passes for Venice public water transport and guided walking tours'
 );
 
 -- Activities section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, tours) 
+INSERT INTO package_details (package_id, section_type, title, description, tours, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440002',
     'activities',
     'Tour Activities',
-    'Included Tours & Experiences',
-    '["Licensed tour guide", "Skip-the-line tickets", "Traditional mask painting class", "Welcome prosecco", "Photography assistance"]',
-    '["Private gondola ride through Grand Canal", "St. Mark''s Basilica and Doge''s Palace tour", "Murano and Burano islands excursion", "Traditional Venetian glass-making workshop", "Romantic dinner at canal-side restaurant"]'
+    'Included tours & experiences exploring Venice highlights',
+    '["Private gondola ride through Grand Canal", "St. Mark''s Basilica and Doge''s Palace tour", "Murano and Burano islands excursion", "Traditional Venetian glass-making workshop", "Romantic dinner at canal-side restaurant"]',
+    '["Licensed tour guide", "Skip-the-line tickets", "Traditional mask painting class", "Welcome prosecco", "Photography assistance"]'
 );
 
 -- Inclusions section
@@ -644,76 +650,84 @@ VALUES (
     '550e8400-e29b-41d4-a716-446655440002',
     'inclusions',
     'Other Inclusions',
-    'Additional services and amenities included in your package',
+    'Extra benefits and travel essentials for your Venice trip',
     '["Travel insurance for 5 days", "Venice city map and guidebook", "$75 restaurant voucher", "Free souvenir Venetian mask", "Emergency support hotline"]'
 );
 
 -- Add more comprehensive packages
-INSERT INTO packages (id, title, location, duration, price, max_guests, rating, reviews_count, description, category, features, images) VALUES
+INSERT INTO packages (id, title, location, country, duration, people, price, price_value, rating, reviews_count, description, category, features, images, popular, featured, hero_type) VALUES
 -- Alpine Adventure Package
 (
     '550e8400-e29b-41d4-a716-446655440003',
     'Alpine Adventure',
     'Switzerland',
-    '6 Days, 5 Nights',
+    'SWITZERLAND',
+    '6 Days',
+    '2-4 People',
+    '$2,799',
     2799.00,
-    4,
     4.7,
     189,
     'Experience the breathtaking beauty of the Swiss Alps with luxury mountain lodges, scenic train rides, and outdoor adventures. Perfect for nature lovers and adventure seekers.',
     'Adventure',
     '["4-Star Mountain Lodge", "All Meals Included", "Cable Car Access", "Hiking Guide", "Spa Facilities"]',
-    '["/mountain-lake-sunset-alps.jpg", "/mountain-adventure-hiking-scenic-landscape.jpg", "/mountain-hiking-adventure-landscape.jpg"]'
+    '["/mountain-lake-sunset-alps.jpg", "/mountain-adventure-hiking-scenic-landscape.jpg", "/mountain-hiking-adventure-landscape.jpg"]',
+    TRUE,
+    FALSE,
+    'mountain'
 ),
 -- Tropical Paradise Package
 (
     '550e8400-e29b-41d4-a716-446655440004',
     'Tropical Paradise',
     'Maldives',
-    '8 Days, 7 Nights',
+    'MALDIVES',
+    '8 Days',
+    '2 People',
+    '$3,499',
     3499.00,
-    2,
     4.9,
     428,
     'Escape to crystal-clear waters and pristine beaches in an overwater villa. Includes snorkeling, spa treatments, and romantic beachside dining experiences.',
     'Beach',
     '["5-Star Overwater Villa", "All-Inclusive", "Private Butler", "Water Sports", "Couples Spa"]',
-    '["/tropical-beach-paradise-sunset.jpg", "/tropical-beach-paradise-sunset-palm-trees.jpg", "/tropical-beach-palm-trees-resort.jpg"]'
+    '["/tropical-beach-paradise-sunset.jpg", "/tropical-beach-paradise-sunset-palm-trees.jpg", "/tropical-beach-palm-trees-resort.jpg"]',
+    TRUE,
+    TRUE,
+    'beach'
 );
 
 -- Insert package details for Alpine Adventure
 -- Accommodation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, nights_info) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440003',
     'accommodation',
     'Hotel Accommodation',
     '5 nights stay at Alpine Grand Lodge (Mountain View Suite)',
-    '["Free Wi-Fi", "Mountain view balcony", "Full breakfast buffet", "Spa and wellness center", "Ski equipment rental", "Concierge service"]',
-    '5 nights stay at Alpine Grand Lodge (Mountain View Suite)'
+    '["Free Wi-Fi", "Mountain view balcony", "Full breakfast buffet", "Spa and wellness center", "Ski equipment rental", "Concierge service"]'
 );
 
 -- Transportation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, flights_info, local_transport) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities, local) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440003',
     'transportation',
     'Transportation',
     'Round-trip flights to Zurich Airport with scenic train transfer',
     '["Business class seating", "Priority boarding", "Extra baggage allowance", "Airport lounge access"]',
-    'Round-trip flights to Zurich Airport with scenic train transfer',
     'Private mountain transfers and cable car passes for all excursions'
 );
 
 -- Activities section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, tours) 
+INSERT INTO package_details (package_id, section_type, title, description, tours, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440003',
     'activities',
     'Tour Activities',
-    'Included Tours & Experiences',
-    '["Certified mountain guide", "All equipment provided", "Safety briefings", "Group photos", "Refreshments during tours"]',
-    '["Jungfraujoch railway excursion", "Guided alpine hiking tours", "Cable car scenic rides", "Traditional Swiss cheese making", "Lake cruise with mountain views"]'
+    'Included tours & experiences exploring Swiss Alps highlights',
+    '["Jungfraujoch railway excursion", "Guided alpine hiking tours", "Cable car scenic rides", "Traditional Swiss cheese making", "Lake cruise with mountain views"]',
+    '["Certified mountain guide", "All equipment provided", "Safety briefings", "Group photos", "Refreshments during tours"]'
 );
 
 -- Inclusions section
@@ -722,43 +736,41 @@ VALUES (
     '550e8400-e29b-41d4-a716-446655440003',
     'inclusions',
     'Other Inclusions',
-    'Additional services and amenities included in your package',
+    'Extra benefits and travel essentials for your Swiss Alps trip',
     '["Comprehensive travel and adventure insurance", "Swiss Travel Pass for public transport", "$150 dining voucher", "Traditional Swiss souvenir package", "24/7 mountain rescue support"]'
 );
 
 -- Insert package details for Tropical Paradise
 -- Accommodation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, nights_info) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440004',
     'accommodation',
     'Hotel Accommodation',
     '7 nights stay at Paradise Resort Maldives (Overwater Villa)',
-    '["Free Wi-Fi", "Direct ocean access", "Private deck with loungers", "Glass floor viewing", "24-hour butler service", "Complimentary minibar"]',
-    '7 nights stay at Paradise Resort Maldives (Overwater Villa)'
+    '["Free Wi-Fi", "Direct ocean access", "Private deck with loungers", "Glass floor viewing", "24-hour butler service", "Complimentary minibar"]'
 );
 
 -- Transportation section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, flights_info, local_transport) 
+INSERT INTO package_details (package_id, section_type, title, description, amenities, local) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440004',
     'transportation',
     'Transportation',
     'Round-trip flights to Male International Airport with seaplane transfer',
     '["First class seating", "Priority check-in", "Luxury lounge access", "Expedited immigration"]',
-    'Round-trip flights to Male International Airport with seaplane transfer',
     'Seaplane transfers to resort and speedboat for excursions'
 );
 
 -- Activities section
-INSERT INTO package_details (package_id, section_type, title, description, amenities, tours) 
+INSERT INTO package_details (package_id, section_type, title, description, tours, amenities) 
 VALUES (
     '550e8400-e29b-41d4-a716-446655440004',
     'activities',
     'Tour Activities',
-    'Included Tours & Experiences',
-    '["PADI certified instructors", "All snorkeling equipment", "Underwater photography", "Marine biologist guide", "Sunset refreshments"]',
-    '["Dolphin watching cruise", "Snorkeling at coral reefs", "Sunset fishing expedition", "Local island cultural tour", "Private beach picnic"]'
+    'Included tours & experiences exploring Maldives highlights',
+    '["Dolphin watching cruise", "Snorkeling at coral reefs", "Sunset fishing expedition", "Local island cultural tour", "Private beach picnic"]',
+    '["PADI certified instructors", "All snorkeling equipment", "Underwater photography", "Marine biologist guide", "Sunset refreshments"]'
 );
 
 -- Inclusions section
@@ -767,7 +779,7 @@ VALUES (
     '550e8400-e29b-41d4-a716-446655440004',
     'inclusions',
     'Other Inclusions',
-    'Additional services and amenities included in your package',
+    'Extra benefits and travel essentials for your Maldives trip',
     '["Comprehensive travel insurance", "All-inclusive dining and beverages", "$200 spa treatment credit", "Complimentary couples photography session", "24/7 concierge service"]'
 );
 

@@ -11,7 +11,7 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname()
   
   // Check if current page should hide sidebar
-  const shouldHideSidebar = pathname?.includes('/packages/add') || pathname?.includes('/packages/edit')
+  const shouldHideSidebar = pathname?.includes('/packages/add') || pathname?.includes('/packages/edit') || pathname?.includes('/packages/view')
 
   return (
     <div className="min-h-screen bg-gray-50">

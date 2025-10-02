@@ -1,9 +1,10 @@
 "use client"
 
-import { MapPin, Calendar, Users, Star, Check, ArrowRight, Sparkles, Award, Shield, Search, Filter, ChevronDown } from "lucide-react"
+import { MapPin, Calendar, Users, Star, Check, ArrowRight, Sparkles, Award, Shield, Search, Filter, ChevronDown, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Header from "@/components/header"
 import { useEffect, useState } from "react"
+import { getAllPackages } from "@/lib/packages"
 
 export default function PackagesPage() {
   const [isVisible, setIsVisible] = useState({})
@@ -20,6 +21,28 @@ export default function PackagesPage() {
   })
   const [currentSlide, setCurrentSlide] = useState(0)
   const [heroFilter, setHeroFilter] = useState("All")
+  const [packages, setPackages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Fetch packages from database
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        setLoading(true)
+        const data = await getAllPackages()
+        setPackages(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching packages:', err)
+        setError('Failed to load packages. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPackages()
+  }, [])
 
   // Function to handle hero filter and scroll to packages
   const handleHeroFilter = (filter) => {
@@ -63,321 +86,52 @@ export default function PackagesPage() {
     return () => observer.disconnect()
   }, [])
 
+  // Filtering logic
+  const filteredPackages = packages.filter((pkg) => {
+    const matchesSearch = pkg.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         pkg.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (pkg.country && pkg.country.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    const matchesCategory = selectedCategory === "All" || pkg.category === selectedCategory
+    
+    const packagePrice = pkg.price_value || parseInt(pkg.price?.replace(/[$,]/g, '')) || 0
+    const matchesPrice = priceRange === "All" ||
+      (priceRange === "Under $1,500" && packagePrice < 1500) ||
+      (priceRange === "$1,500 - $2,500" && packagePrice >= 1500 && packagePrice <= 2500) ||
+      (priceRange === "$2,500 - $3,500" && packagePrice > 2500 && packagePrice <= 3500) ||
+      (priceRange === "Above $3,500" && packagePrice > 3500)
+
+    // Hero filter logic - simplified for now, can be enhanced based on package categories
+    const matchesHeroFilter = heroFilter === "All" || 
+      (heroFilter === "Popular" && pkg.rating >= 4.5) ||
+      (heroFilter === "Beach" && (pkg.category?.toLowerCase().includes('beach') || pkg.location?.toLowerCase().includes('beach'))) ||
+      (heroFilter === "Mountain" && (pkg.category?.toLowerCase().includes('mountain') || pkg.location?.toLowerCase().includes('alps') || pkg.location?.toLowerCase().includes('mountain'))) ||
+      (heroFilter === "City" && (pkg.category?.toLowerCase().includes('city') || pkg.location?.toLowerCase().includes('city')))
+
+    return matchesSearch && matchesCategory && matchesPrice && matchesHeroFilter
+  })
+
+  // Use top-rated packages for carousel
+  const carouselData = packages.length > 0 
+    ? packages.slice(0, 4).map(pkg => ({
+        ...pkg,
+        image: pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg",
+        reviews: pkg.reviews_count || 0
+      }))
+    : []
+  
+  const regularPackages = filteredPackages
+
   // Carousel auto-slide effect
   useEffect(() => {
+    if (carouselData.length === 0) return
+    
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % carouselData.length)
     }, 5000) // Change slide every 5 seconds for better viewing time
 
     return () => clearInterval(interval)
-  }, [])
-
-  const packages = [
-    {
-      id: 1,
-      title: "Santorini Paradise",
-      location: "Greece",
-      country: "GREECE",
-      duration: "7 Days",
-      people: "2-4 People",
-      price: "$2,499",
-      priceValue: 2499,
-      rating: 4.9,
-      reviews: 342,
-      image: "/santorini-blue-domes-greece.jpg",
-      features: ["5-Star Hotel", "All Meals", "Tour Guide", "Transportation"],
-      category: "International",
-      popular: true,
-      featured: true,
-      heroType: "beach",
-      details: {
-        accommodation: {
-          title: "Hotel Accommodation",
-          nights: "6 nights stay at Santorini Blue Resort (Premium Suite)",
-          amenities: ["Free Wi-Fi", "Private balcony with caldera view", "Daily breakfast", "Infinity pool access", "Concierge service", "Airport transfers"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights from major cities to Santorini",
-          amenities: ["Premium economy seating", "In-flight meals", "Airport lounge access", "Travel insurance"],
-          local: "Private transfers and local transportation for all tour activities"
-        },
-        activities: {
-          title: "Tour Activities",
-          tours: ["Oia Village sunset tour", "Wine tasting at traditional wineries", "Caldera boat cruise", "Red Beach and Kamari Beach visits", "Fira town exploration"],
-          amenities: ["Professional tour guide", "All entrance fees included", "Photography sessions", "Traditional Greek lunch", "Bottled water and snacks"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Comprehensive travel insurance for 7 days", "Free welcome dinner with live music", "Souvenir shopping voucher worth $100", "24/7 customer support"]
-        }
-      }
-    },
-    {
-      id: 2,
-      title: "Venice Romance",
-      location: "Italy",
-      country: "ITALY",
-      duration: "5 Days",
-      people: "2 People",
-      price: "$1,899",
-      priceValue: 1899,
-      rating: 4.8,
-      reviews: 256,
-      image: "/venice-italy-canal-buildings.jpg",
-      features: ["4-Star Hotel", "Breakfast", "Gondola Ride", "City Tours"],
-      category: "International",
-      popular: false,
-      heroType: "city",
-      details: {
-        accommodation: {
-          title: "Hotel Accommodation",
-          nights: "4 nights stay at Hotel Danieli Venice (Canal View Room)",
-          amenities: ["Free Wi-Fi", "Canal view balcony", "Continental breakfast", "Room service", "Historic palazzo setting", "24-hour front desk"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights to Venice Marco Polo Airport",
-          amenities: ["Economy plus seating", "Checked baggage included", "Airport transfers via water taxi"],
-          local: "Vaporetto passes for Venice public water transport and walking tours"
-        },
-        activities: {
-          title: "Tour Activities",
-          tours: ["Private gondola ride through Grand Canal", "St. Mark's Basilica and Doge's Palace tour", "Murano and Burano islands excursion", "Traditional Venetian glass-making workshop", "Romantic dinner at canal-side restaurant"],
-          amenities: ["Licensed tour guide", "Skip-the-line tickets", "Traditional mask painting class", "Welcome prosecco", "Photography assistance"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Travel insurance for 5 days", "Venice city map and guidebook", "$75 restaurant voucher", "Free souvenir Venetian mask", "Emergency support hotline"]
-        }
-      }
-    },
-    {
-      id: 3,
-      title: "Alpine Adventure",
-      location: "Switzerland",
-      country: "SWITZERLAND",
-      duration: "6 Days",
-      people: "2-6 People",
-      price: "$2,799",
-      priceValue: 2799,
-      rating: 5.0,
-      reviews: 189,
-      image: "/mountain-lake-sunset-alps.jpg",
-      features: ["Mountain Lodge", "All Meals", "Ski Pass", "Equipment"],
-      category: "International",
-      popular: false,
-      heroType: "mountain",
-      details: {
-        accommodation: {
-          title: "Hotel Accommodation",
-          nights: "5 nights stay at Alpine Grand Lodge (Mountain View Suite)",
-          amenities: ["Free Wi-Fi", "Mountain panorama views", "All meals included", "Spa and wellness center", "Heated indoor pool", "Ski equipment storage"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights to Zurich Airport with connecting train to resort",
-          amenities: ["Premium economy seating", "Swiss Travel Pass included", "Mountain railway tickets", "Airport and resort transfers"],
-          local: "Cable car passes and local shuttle service to ski slopes and attractions"
-        },
-        activities: {
-          title: "Tour Activities",
-          tours: ["Guided mountain hiking with professional alpine guide", "Jungfraujoch - Top of Europe excursion", "Lake Geneva boat cruise", "Traditional Swiss cheese and chocolate factory tours", "Paragliding experience (weather permitting)"],
-          amenities: ["Certified mountain guide", "All safety equipment provided", "Alpine photography sessions", "Swiss traditional lunch", "Emergency mountain rescue insurance"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Comprehensive travel and adventure insurance for 6 days", "Swiss knife souvenir", "$120 shopping voucher for Swiss products", "Traditional Swiss fondue dinner", "24/7 mountain rescue support"]
-        }
-      }
-    },
-    {
-      id: 4,
-      title: "Tropical Escape",
-      location: "Maldives",
-      country: "MALDIVES",
-      duration: "8 Days",
-      people: "2 People",
-      price: "$3,299",
-      priceValue: 3299,
-      rating: 4.9,
-      reviews: 421,
-      image: "/tropical-beach-palm-trees-resort.jpg",
-      features: ["Beach Villa", "All Inclusive", "Water Sports", "Spa Access"],
-      category: "International",
-      popular: true,
-      heroType: "beach",
-      details: {
-        accommodation: {
-          title: "Hotel Accommodation",
-          nights: "7 nights stay at Maldives Paradise Resort (Overwater Villa)",
-          amenities: ["Free Wi-Fi", "Private deck with ocean access", "All meals and beverages", "Butler service", "Spa treatments", "Water sports equipment"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights with seaplane transfer to resort",
-          amenities: ["Business class upgrade available", "Champagne service", "Priority check-in", "Scenic seaplane flight"],
-          local: "Resort boat transfers and island hopping excursions included"
-        },
-        activities: {
-          title: "Tour Activities",
-          tours: ["Snorkeling and diving expeditions", "Dolphin watching cruise", "Sunset fishing trip", "Island hopping to local villages", "Couples spa treatments and beach dining"],
-          amenities: ["PADI certified dive instructors", "All water sports equipment", "Underwater photography", "Traditional Maldivian cultural show", "Private beach access"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Comprehensive travel insurance for 8 days", "Underwater camera rental", "$200 spa credit", "Romantic beachside dinner setup", "24/7 resort concierge service"]
-        }
-      }
-    },
-    {
-      id: 5,
-      title: "Greek Islands Tour",
-      location: "Greece",
-      country: "GREECE",
-      duration: "10 Days",
-      people: "4-8 People",
-      price: "$2,199",
-      priceValue: 2199,
-      rating: 4.7,
-      reviews: 298,
-      image: "/white-greek-buildings-blue-doors.jpg",
-      features: ["Island Hopping", "Hotels", "Ferry Tickets", "Local Guide"],
-      category: "International",
-      popular: false,
-      heroType: "beach",
-      details: {
-        accommodation: {
-          title: "Hotel Accommodation",
-          nights: "9 nights across multiple islands (Mykonos, Santorini, Naxos - 3 nights each)",
-          amenities: ["Free Wi-Fi", "Sea view rooms", "Daily breakfast", "Swimming pools", "Traditional Greek architecture", "Balconies with island views"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights to Athens with domestic connections",
-          amenities: ["Economy class seating", "Inter-island ferry tickets", "Port transfers included", "Luggage handling"],
-          local: "High-speed ferries between islands and local transportation on each island"
-        },
-        activities: {
-          title: "Tour Activities",
-          tours: ["Mykonos windmills and Little Venice tour", "Santorini caldera cruise and Oia sunset", "Naxos ancient temple visits", "Traditional Greek cooking class", "Beach hopping and swimming excursions"],
-          amenities: ["Expert local guides on each island", "All entrance fees included", "Traditional Greek music and dance show", "Wine tasting sessions", "Photography opportunities at iconic spots"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Travel insurance for 10 days", "Greek island guidebook and maps", "$150 souvenir shopping credit", "Traditional Greek feast dinner", "Emergency support across all islands"]
-        }
-      }
-    },
-    {
-      id: 6,
-      title: "Mediterranean Cruise",
-      location: "Multiple",
-      country: "MULTIPLE",
-      duration: "12 Days",
-      people: "2-4 People",
-      price: "$3,899",
-      priceValue: 3899,
-      rating: 4.8,
-      reviews: 512,
-      image: "/santorini-greece-infinity-pool-ocean.jpg",
-      features: ["Luxury Cruise", "All Inclusive", "Shore Excursions", "Entertainment"],
-      category: "International",
-      popular: true,
-      heroType: "beach",
-      details: {
-        accommodation: {
-          title: "Cruise Accommodation",
-          nights: "11 nights aboard luxury cruise ship (Balcony Stateroom)",
-          amenities: ["Private balcony with ocean views", "24-hour room service", "All meals and beverages included", "Nightly turndown service", "Concierge services", "Premium bedding and amenities"]
-        },
-        transportation: {
-          title: "Transportation",
-          flights: "Round-trip flights to Barcelona with cruise port transfers",
-          amenities: ["Premium economy flights", "Priority boarding", "Airport lounge access", "Cruise terminal transfers"],
-          local: "Luxury cruise ship with stops in Barcelona, Monaco, Rome, Santorini, Mykonos, and Naples"
-        },
-        activities: {
-          title: "Shore Excursions & Activities",
-          tours: ["Guided tours in each port city", "Vatican Museums and Sistine Chapel (Rome)", "Monte Carlo casino and palace visit", "Santorini wine tasting and sunset viewing", "Pompeii archaeological site exploration"],
-          amenities: ["Professional shore excursion guides", "All entrance fees included", "Onboard entertainment and shows", "Multiple dining venues", "Spa and fitness facilities"]
-        },
-        inclusions: {
-          title: "Other Inclusions",
-          items: ["Comprehensive cruise and travel insurance for 12 days", "Onboard WiFi package", "$300 onboard credit for spa and shopping", "Captain's gala dinner", "24/7 guest services and medical facilities"]
-        }
-      }
-    },
-  ]
-
-  // Filtering logic
-  const filteredPackages = packages.filter((pkg) => {
-    const matchesSearch = pkg.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         pkg.location.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesCategory = selectedCategory === "All" || pkg.category === selectedCategory
-    
-    const matchesPrice = priceRange === "All" ||
-      (priceRange === "Under $1,500" && pkg.priceValue < 1500) ||
-      (priceRange === "$1,500 - $2,500" && pkg.priceValue >= 1500 && pkg.priceValue <= 2500) ||
-      (priceRange === "$2,500 - $3,500" && pkg.priceValue > 2500 && pkg.priceValue <= 3500) ||
-      (priceRange === "Above $3,500" && pkg.priceValue > 3500)
-
-    // Hero filter logic
-    const matchesHeroFilter = heroFilter === "All" || 
-      (heroFilter === "Popular" && pkg.popular) ||
-      (heroFilter === "Beach" && pkg.heroType === "beach") ||
-      (heroFilter === "Mountain" && pkg.heroType === "mountain") ||
-      (heroFilter === "City" && pkg.heroType === "city")
-
-    return matchesSearch && matchesCategory && matchesPrice && matchesHeroFilter
-  })
-
-  const featuredPackage = filteredPackages.find((pkg) => pkg.featured)
-  const regularPackages = filteredPackages.filter((pkg) => !pkg.featured)
-
-  // Carousel data with different packages
-  const carouselData = [
-    // Featured package as first slide
-    ...(featuredPackage ? [featuredPackage] : []),
-    // Additional diverse packages
-    {
-      id: 'carousel-2',
-      title: "Venice Romance",
-      location: "Italy",
-      duration: "5 Days",
-      people: "2 People",
-      price: "$1,899",
-      rating: 4.8,
-      reviews: 256,
-      image: "/venice-italy-canal-buildings.jpg",
-      features: ["4-Star Hotel", "Breakfast", "Gondola Ride", "City Tours"]
-    },
-    {
-      id: 'carousel-3',
-      title: "Alpine Adventure",
-      location: "Switzerland",
-      duration: "6 Days",
-      people: "2-6 People",
-      price: "$2,799",
-      rating: 5.0,
-      reviews: 189,
-      image: "/mountain-lake-sunset-alps.jpg",
-      features: ["Mountain Lodge", "All Meals", "Ski Pass", "Equipment"]
-    },
-    {
-      id: 'carousel-4',
-      title: "Tropical Escape",
-      location: "Maldives",
-      duration: "8 Days",
-      people: "2 People",
-      price: "$3,299",
-      rating: 4.9,
-      reviews: 421,
-      image: "/tropical-beach-paradise-sunset.jpg",
-      features: ["Beach Villa", "All Inclusive", "Water Sports", "Spa Access"]
-    }
-  ]
+  }, [carouselData.length])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -599,7 +353,7 @@ export default function PackagesPage() {
                         transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
                         transitionDelay: index === currentSlide ? '1800ms' : '0ms'
                       }}>
-                        <Link href={`/packages/${typeof slide.id === 'string' && slide.id.startsWith('carousel-') ? '1' : slide.id}`}>
+                        <Link href={`/packages/${slide.slug || 'default'}`}>
                           <button className="bg-gradient-to-r from-white to-gray-50 text-gray-900 px-10 py-4 rounded-full font-bold hover:from-gray-50 hover:to-white transition-all inline-flex items-center gap-3 hover:scale-105 group shadow-2xl border border-white/20 backdrop-blur-sm">
                             <span>View Details</span>
                             <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform duration-300" />
@@ -991,8 +745,27 @@ export default function PackagesPage() {
             </div>
             
             <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-8 transition-all duration-700 ease-out">
-              {regularPackages.map((pkg, index) => (
-            <Link key={pkg.id} href={`/packages/${pkg.id}`}>
+              {loading ? (
+                <div className="col-span-full flex items-center justify-center py-20">
+                  <Loader2 className="animate-spin text-blue-500" size={48} />
+                  <span className="ml-3 text-gray-600 text-lg">Loading packages...</span>
+                </div>
+              ) : error ? (
+                <div className="col-span-full text-center py-20">
+                  <p className="text-red-600 text-lg mb-4">{error}</p>
+                  <button 
+                    onClick={() => window.location.reload()} 
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : regularPackages.length === 0 ? (
+                <div className="col-span-full text-center py-20">
+                  <p className="text-gray-600 text-lg">No packages found matching your criteria.</p>
+                </div>
+              ) : regularPackages.map((pkg, index) => (
+            <Link key={pkg.id} href={`/packages/${pkg.slug}`}>
               <div 
                 className="group relative bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-500 h-full flex flex-col transform hover:scale-[1.02] hover:-translate-y-2"
                 style={{
@@ -1002,7 +775,7 @@ export default function PackagesPage() {
                 {/* Image */}
                 <div className="relative h-96 overflow-hidden bg-gray-100">
                   <img
-                    src={pkg.image || "/placeholder.svg"}
+                    src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg"}
                     alt={pkg.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700 ease-out"
                   />
@@ -1010,11 +783,11 @@ export default function PackagesPage() {
 
                   {/* Price Badge - Top Left */}
                   <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-lg font-bold text-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-blue-600 shadow-lg">
-                    {pkg.price}
+                    {pkg.price || `$${pkg.price_value?.toLocaleString()}`}
                   </div>
 
                   {/* Popular Badge - Top Right */}
-                  {pkg.popular && (
+                  {pkg.rating >= 4.5 && (
                     <div className="absolute top-4 right-4 bg-orange-500 text-white px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 group-hover:scale-105 group-hover:bg-orange-600 shadow-lg">
                       Popular
                     </div>
@@ -1026,14 +799,14 @@ export default function PackagesPage() {
                       {pkg.title.toUpperCase()}
                     </h3>
                     <p className="text-sm text-white/90 mb-3 line-clamp-2 transition-all duration-300 group-hover:text-base group-hover:text-white">
-                      {pkg.features.join(', ')}
+                      {pkg.features && pkg.features.length > 0 ? pkg.features.join(', ') : pkg.highlights || 'Explore this amazing destination'}
                     </p>
                     
                     {/* Location and Duration Tags */}
                     <div className="flex gap-2 mb-3 transition-all duration-300">
                       <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
                         <MapPin size={12} className="transition-all duration-300 group-hover:scale-110" />
-                        <span className="text-xs font-medium">{pkg.country}</span>
+                        <span className="text-xs font-medium">{pkg.location}</span>
                       </div>
                       <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
                         <Calendar size={12} className="transition-all duration-300 group-hover:scale-110" />
@@ -1046,13 +819,13 @@ export default function PackagesPage() {
                       <div className="flex items-center gap-2 transition-all duration-300 group-hover:scale-105">
                         <div className="flex items-center gap-1">
                           <Star className="fill-yellow-400 text-yellow-400 transition-all duration-300 group-hover:scale-110" size={14} />
-                          <span className="font-bold text-sm transition-all duration-300 group-hover:text-base">{pkg.rating}</span>
-                          <span className="text-xs text-white/80 transition-all duration-300 group-hover:text-sm group-hover:text-white/90">({pkg.reviews})</span>
+                          <span className="font-bold text-sm transition-all duration-300 group-hover:text-base">{pkg.rating || 0}</span>
+                          <span className="text-xs text-white/80 transition-all duration-300 group-hover:text-sm group-hover:text-white/90">({pkg.reviews_count || 0})</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-xs transition-all duration-300 group-hover:text-sm group-hover:scale-105">
                         <Users size={12} className="transition-all duration-300 group-hover:scale-110" />
-                        <span>{pkg.people}</span>
+                        <span>{pkg.people || 2} People</span>
                       </div>
                     </div>
                   </div>

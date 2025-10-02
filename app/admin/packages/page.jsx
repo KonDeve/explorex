@@ -1,63 +1,60 @@
 "use client"
 
-import { Plus, Edit, Trash2, Eye, MapPin, Calendar, Users, DollarSign, Search, Grid, List } from "lucide-react"
-import { useState } from "react"
+import { Plus, Edit, Trash2, Eye, MapPin, Calendar, Users, DollarSign, Search, Grid, List, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { getAllPackages, deletePackage } from "@/lib/packages"
 
 export default function AdminPackages() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState("grid") // Added view mode toggle
+  const [viewMode, setViewMode] = useState("grid")
+  const [packages, setPackages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const packages = [
-    {
-      id: 1,
-      title: "Santorini Paradise",
-      location: "Greece",
-      duration: "7 Days",
-      price: 2499,
-      availability: "Available",
-      bookings: 45,
-      image: "/santorini-blue-domes-greece.jpg",
-    },
-    {
-      id: 2,
-      title: "Venice Romance",
-      location: "Italy",
-      duration: "5 Days",
-      price: 1899,
-      availability: "Available",
-      bookings: 28,
-      image: "/venice-italy-canal-buildings.jpg",
-    },
-    {
-      id: 3,
-      title: "Alpine Adventure",
-      location: "Switzerland",
-      duration: "6 Days",
-      price: 2799,
-      availability: "Limited",
-      bookings: 32,
-      image: "/mountain-lake-sunset-alps.jpg",
-    },
-    {
-      id: 4,
-      title: "Tropical Escape",
-      location: "Maldives",
-      duration: "8 Days",
-      price: 3299,
-      availability: "Available",
-      bookings: 38,
-      image: "/tropical-beach-palm-trees-resort.jpg",
-    },
-  ]
+  // Fetch packages from database
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        setLoading(true)
+        const data = await getAllPackages()
+        setPackages(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching packages:', err)
+        setError('Failed to load packages')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPackages()
+  }, [])
 
   const handleCreatePackage = () => {
     router.push('/admin/packages/add')
   }
 
   const handleEditPackage = (pkg) => {
-    router.push(`/admin/packages/edit/${pkg.id}`)
+    // Store the package ID in sessionStorage for security
+    sessionStorage.setItem('editPackageId', pkg.id)
+    router.push('/admin/packages/add')
+  }
+
+  const handleDeletePackage = async (packageId) => {
+    if (!confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await deletePackage(packageId)
+      // Refresh the packages list
+      setPackages(packages.filter(pkg => pkg.id !== packageId))
+    } catch (err) {
+      console.error('Error deleting package:', err)
+      alert('Failed to delete package. Please try again.')
+    }
   }
 
   return (
@@ -120,7 +117,27 @@ export default function AdminPackages() {
         </div>
       </div>
 
-      {viewMode === "grid" ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="animate-spin text-blue-500" size={48} />
+          <span className="ml-3 text-gray-600 text-lg">Loading packages...</span>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600">{error}</p>
+        </div>
+      ) : packages.length === 0 ? (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
+          <p className="text-gray-600 mb-4">No packages found. Create your first package to get started!</p>
+          <button
+            onClick={handleCreatePackage}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Add New Package
+          </button>
+        </div>
+      ) : viewMode === "grid" ? (
         // Grid View
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packages.map((pkg) => (
@@ -128,7 +145,7 @@ export default function AdminPackages() {
               {/* Image */}
               <div className="relative h-48 overflow-hidden">
                 <img
-                  src={pkg.image || "/placeholder.svg"}
+                  src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg"}
                   alt={pkg.title}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
@@ -154,7 +171,7 @@ export default function AdminPackages() {
                 <div className="space-y-2 mb-6">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <MapPin size={16} className="text-gray-400" />
-                    <span>{pkg.location}</span>
+                    <span>{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar size={16} className="text-gray-400" />
@@ -162,11 +179,11 @@ export default function AdminPackages() {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Users size={16} className="text-gray-400" />
-                    <span>{pkg.bookings} bookings</span>
+                    <span>{pkg.people || 2} People</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                     <DollarSign size={16} className="text-gray-400" />
-                    <span>${pkg.price.toLocaleString()}</span>
+                    <span>{pkg.price || `$${pkg.price_value?.toLocaleString()}`}</span>
                   </div>
                 </div>
 
@@ -179,10 +196,19 @@ export default function AdminPackages() {
                     <Edit size={16} />
                     Edit
                   </button>
-                  <button className="bg-gray-50 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
+                  <button 
+                    onClick={() => {
+                      sessionStorage.setItem('viewPackageId', pkg.id)
+                      router.push('/admin/packages/view')
+                    }}
+                    className="bg-gray-50 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+                  >
                     <Eye size={16} />
                   </button>
-                  <button className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition">
+                  <button 
+                    onClick={() => handleDeletePackage(pkg.id)}
+                    className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -201,7 +227,7 @@ export default function AdminPackages() {
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Location</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Duration</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Price</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Bookings</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">People</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Status</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -212,17 +238,21 @@ export default function AdminPackages() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img
-                          src={pkg.image || "/placeholder.svg"}
+                          src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg"}
                           alt={pkg.title}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                         <div className="font-semibold text-gray-900">{pkg.title}</div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{pkg.location}</td>
+                    <td className="py-4 px-6 text-sm text-gray-600">
+                      {pkg.location}{pkg.country ? `, ${pkg.country}` : ''}
+                    </td>
                     <td className="py-4 px-6 text-sm text-gray-600">{pkg.duration}</td>
-                    <td className="py-4 px-6 text-sm font-semibold text-gray-900">${pkg.price.toLocaleString()}</td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{pkg.bookings}</td>
+                    <td className="py-4 px-6 text-sm font-semibold text-gray-900">
+                      {pkg.price || `$${pkg.price_value?.toLocaleString()}`}
+                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-600">{pkg.people || 2} People</td>
                     <td className="py-4 px-6">
                       <span
                         className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
@@ -244,10 +274,19 @@ export default function AdminPackages() {
                         >
                           <Edit size={16} />
                         </button>
-                        <button className="p-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                        <button 
+                          onClick={() => {
+                            sessionStorage.setItem('viewPackageId', pkg.id)
+                            router.push('/admin/packages/view')
+                          }}
+                          className="p-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition"
+                        >
                           <Eye size={16} />
                         </button>
-                        <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition">
+                        <button 
+                          onClick={() => handleDeletePackage(pkg.id)}
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>

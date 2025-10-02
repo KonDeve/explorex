@@ -1,72 +1,51 @@
 "use client"
 
 import Header from "@/components/header"
-import { ArrowLeft, MapPin, Calendar, Users, Star, CreditCard, Lock, Shield, CheckCircle, Clock, DollarSign } from "lucide-react"
+import { ArrowLeft, MapPin, Calendar, Users, Star, CreditCard, Lock, Shield, CheckCircle, Clock, DollarSign, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
-
-// Mock data - in a real app this would come from an API
-const getBookingById = (id) => {
-  const allBookings = {
-    "BK-001": {
-      id: "BK-001",
-      package: "Santorini Paradise",
-      location: "Greece",
-      checkIn: "2025-06-15",
-      checkOut: "2025-06-22",
-      guests: "2 Adults",
-      image: "/santorini-blue-domes-greece.jpg",
-      status: "confirmed",
-      type: "upcoming",
-      totalPrice: "$2,499",
-      priceNumeric: 2499,
-      duration: "7 Days, 6 Nights",
-      hotelName: "Santorini Blue Resort",
-      hotelRating: 5,
-      confirmation: "XPL-SAN-2025-001",
-      features: ["5-Star Hotel", "All Meals Included", "Airport Transfer", "Tour Guide", "Spa Access"],
-      priceBreakdown: {
-        basePrice: 2199,
-        taxes: 300,
-        serviceFee: 150,
-        discount: 150,
-        total: 2499
-      }
-    },
-    "BK-003": {
-      id: "BK-003",
-      package: "Alpine Adventure",
-      location: "Switzerland",
-      checkIn: "2025-08-10",
-      checkOut: "2025-08-16",
-      guests: "4 Adults",
-      image: "/mountain-lake-sunset-alps.jpg",
-      status: "confirmed",
-      type: "upcoming",
-      totalPrice: "$2,799",
-      priceNumeric: 2799,
-      duration: "6 Days, 5 Nights",
-      hotelName: "Alpine Grand Lodge",
-      hotelRating: 4,
-      confirmation: "XPL-ALP-2025-003",
-      features: ["Mountain Lodge", "All Meals", "Ski Equipment", "Cable Car Pass", "Hiking Guide"],
-      priceBreakdown: {
-        basePrice: 2399,
-        taxes: 400,
-        serviceFee: 180,
-        discount: 180,
-        total: 2799
-      }
-    }
-  }
-  return allBookings[id] || null
-}
+import { getPackageBySlug } from "@/lib/packages"
+import { getUserBookings } from "@/lib/bookings"
+import { useAuth } from "@/lib/AuthContext"
 
 export default function PaymentPage({ params }) {
-  const { id } = params
-  const booking = getBookingById(id)
+  const { slug } = params
+  const { user } = useAuth()
+  const [booking, setBooking] = useState(null)
+  const [packageData, setPackageData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [paymentOption, setPaymentOption] = useState('full')
   const [isLoaded, setIsLoaded] = useState(false)
+
+  // Fetch booking and package data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user || !slug) return
+
+      try {
+        setLoading(true)
+        
+        // Fetch package by slug
+        const pkgData = await getPackageBySlug(slug)
+        setPackageData(pkgData)
+
+        // Fetch user's bookings to find the one for this package
+        const result = await getUserBookings(user.id)
+        if (result.success) {
+          const foundBooking = result.bookings.find(b => b.package?.slug === slug)
+          setBooking(foundBooking)
+        }
+      } catch (err) {
+        console.error('Error fetching payment data:', err)
+        setError('Failed to load payment details')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [user, slug])
 
   useEffect(() => {
     // Trigger animations after component mounts
@@ -76,7 +55,19 @@ export default function PaymentPage({ params }) {
     return () => clearTimeout(timer)
   }, [])
 
-  if (!booking) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header activePage="dashboard" />
+        <div className="container mx-auto px-4 py-12 flex items-center justify-center">
+          <Loader2 className="animate-spin text-blue-500" size={48} />
+          <span className="ml-3 text-gray-600 text-lg">Loading payment details...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !booking || !packageData) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header activePage="dashboard" />
@@ -97,8 +88,8 @@ export default function PaymentPage({ params }) {
     )
   }
 
-  const partialPayment = Math.round(booking.priceNumeric * 0.3) // 30% down payment
-  const remainingPayment = booking.priceNumeric - partialPayment
+  const partialPayment = Math.round(booking.remaining_balance * 0.3) // 30% down payment
+  const remainingPayment = booking.remaining_balance - partialPayment
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -112,7 +103,7 @@ export default function PaymentPage({ params }) {
           isLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
         }`}>
           <Link 
-            href={`/dashboard/trip/${id}`}
+            href={`/dashboard/trip/${slug}`}
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
           >
             <ArrowLeft size={20} />
@@ -125,7 +116,7 @@ export default function PaymentPage({ params }) {
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
         }`}>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Your Payment</h1>
-          <p className="text-gray-600">Secure your booking for {booking.package}</p>
+          <p className="text-gray-600">Secure your booking for {packageData.title}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -167,7 +158,7 @@ export default function PaymentPage({ params }) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900">${booking.priceNumeric.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-gray-900">₱{booking.remaining_balance.toLocaleString()}</div>
                       <div className="text-sm text-green-600 font-medium">Save 5% • No additional fees</div>
                     </div>
                   </div>
@@ -199,9 +190,9 @@ export default function PaymentPage({ params }) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900">${partialPayment.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-gray-900">₱{partialPayment.toLocaleString()}</div>
                       <div className="text-sm text-gray-600">
-                        Remaining: ${remainingPayment.toLocaleString()}
+                        Remaining: ₱{remainingPayment.toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -281,18 +272,18 @@ export default function PaymentPage({ params }) {
                   {/* Package Image & Basic Info */}
                   <div className="flex gap-4">
                     <img 
-                      src={booking.image} 
-                      alt={booking.package}
+                      src={packageData.images?.[0] || '/placeholder.svg'} 
+                      alt={packageData.title}
                       className="w-20 h-16 object-cover rounded-lg"
                     />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{booking.package}</h4>
+                      <h4 className="font-semibold text-gray-900">{packageData.title}</h4>
                       <div className="flex items-center gap-1 text-gray-600 text-sm">
                         <MapPin size={14} />
-                        <span>{booking.location}</span>
+                        <span>{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</span>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
-                        {[...Array(booking.hotelRating)].map((_, i) => (
+                        {packageData.rating && [...Array(Math.floor(packageData.rating))].map((_, i) => (
                           <Star key={i} size={12} className="fill-yellow-400 text-yellow-400" />
                         ))}
                       </div>
@@ -307,21 +298,21 @@ export default function PaymentPage({ params }) {
                           <Calendar size={14} />
                           <span>Check-in</span>
                         </div>
-                        <span className="font-medium text-gray-900">{booking.checkIn}</span>
+                        <span className="font-medium text-gray-900">{booking.check_in_date}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Calendar size={14} />
                           <span>Check-out</span>
                         </div>
-                        <span className="font-medium text-gray-900">{booking.checkOut}</span>
+                        <span className="font-medium text-gray-900">{booking.check_out_date}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Users size={14} />
                           <span>Guests</span>
                         </div>
-                        <span className="font-medium text-gray-900">{booking.guests}</span>
+                        <span className="font-medium text-gray-900">{booking.total_guests} Adults</span>
                       </div>
                     </div>
                   </div>
@@ -330,15 +321,15 @@ export default function PaymentPage({ params }) {
                   <div className="border-t border-gray-100 pt-4">
                     <h5 className="font-medium text-gray-900 mb-3">Included Features</h5>
                     <div className="space-y-2">
-                      {booking.features.slice(0, 4).map((feature, index) => (
+                      {packageData.features?.slice(0, 4).map((feature, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <CheckCircle size={14} className="text-green-500" />
                           <span className="text-sm text-gray-700">{feature}</span>
                         </div>
                       ))}
-                      {booking.features.length > 4 && (
+                      {packageData.features && packageData.features.length > 4 && (
                         <div className="text-sm text-blue-600 font-medium">
-                          +{booking.features.length - 4} more features
+                          +{packageData.features.length - 4} more features
                         </div>
                       )}
                     </div>
@@ -354,33 +345,29 @@ export default function PaymentPage({ params }) {
                 
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Base price ({booking.duration})</span>
-                    <span className="font-medium">${booking.priceBreakdown.basePrice.toLocaleString()}</span>
+                    <span className="text-gray-600">Base price ({packageData.duration})</span>
+                    <span className="font-medium">₱{booking.total_amount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Taxes & fees</span>
-                    <span className="font-medium">${booking.priceBreakdown.taxes}</span>
+                    <span className="text-gray-600">Amount Paid</span>
+                    <span className="font-medium text-green-600">₱{booking.amount_paid.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Service fee</span>
-                    <span className="font-medium">${booking.priceBreakdown.serviceFee}</span>
-                  </div>
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span className="font-medium">-${booking.priceBreakdown.discount}</span>
+                    <span className="text-gray-600">Remaining Balance</span>
+                    <span className="font-medium text-orange-600">₱{booking.remaining_balance.toLocaleString()}</span>
                   </div>
                   <div className="border-t border-gray-200 pt-3">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-900">
-                        {paymentOption === 'full' ? 'Total Amount' : 'Amount Due Today'}
+                        {paymentOption === 'full' ? 'Total Amount Due' : 'Amount Due Today'}
                       </span>
                       <span className="text-xl font-bold text-gray-900">
-                        ${paymentOption === 'full' ? booking.priceNumeric.toLocaleString() : partialPayment.toLocaleString()}
+                        ₱{paymentOption === 'full' ? booking.remaining_balance.toLocaleString() : partialPayment.toLocaleString()}
                       </span>
                     </div>
                     {paymentOption === 'partial' && (
                       <div className="mt-2 text-sm text-gray-600">
-                        Remaining balance: ${remainingPayment.toLocaleString()}
+                        Remaining balance: ₱{remainingPayment.toLocaleString()}
                       </div>
                     )}
                   </div>
@@ -391,7 +378,7 @@ export default function PaymentPage({ params }) {
               <div className={`transition-all duration-500 ease-out delay-700 ${
                 isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
               }`}>
-                <Link href={`/dashboard/trip/${id}/payment/success`}>
+                <Link href={`/dashboard/trip/${slug}/payment/success`}>
                   <button className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
                     <Lock size={20} />
                     Complete {paymentOption === 'full' ? 'Payment' : 'Down Payment'}
