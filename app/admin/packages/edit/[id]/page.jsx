@@ -52,6 +52,11 @@ export default function EditPackagePage({ params }) {
     features: [""],
     images: [],
     
+    // Deal dates and slots (multiple deals)
+    deals: [
+      { deal_start_date: "", deal_end_date: "", slots_available: "" }
+    ],
+    
     // Additional Details
     availability: "Available",
     
@@ -127,6 +132,15 @@ export default function EditPackagePage({ params }) {
           features: data.features && data.features.length > 0 ? data.features : [""],
           images: data.images || [],
           availability: data.availability || "Available",
+          deals: data.deals && data.deals.length > 0 
+            ? data.deals.map(deal => ({
+                deal_start_date: deal.deal_start_date || "",
+                deal_end_date: deal.deal_end_date || "",
+                slots_available: deal.slots_available?.toString() || "",
+                slots_booked: deal.slots_booked || 0,
+                is_active: deal.is_active !== undefined ? deal.is_active : true
+              }))
+            : [{ deal_start_date: "", deal_end_date: "", slots_available: "" }],
           
           accommodation: {
             description: accommodationDetails?.description || "",
@@ -474,6 +488,96 @@ export default function EditPackagePage({ params }) {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     placeholder="e.g., 4"
                   />
+                </div>
+
+                {/* Deal Periods (Multiple) */}
+                <div className="col-span-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      <Calendar size={16} className="inline mr-1" />
+                      Deal Periods
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        ...formData,
+                        deals: [...formData.deals, { deal_start_date: "", deal_end_date: "", slots_available: "" }]
+                      })}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1"
+                    >
+                      <Plus size={16} />
+                      Add Deal Period
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">Add multiple date ranges when this package is available</p>
+                  
+                  {formData.deals.map((deal, index) => (
+                    <div key={index} className="flex gap-3 items-start p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex-1 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                            <input
+                              type="date"
+                              value={deal.deal_start_date}
+                              onChange={(e) => {
+                                const newDeals = [...formData.deals]
+                                newDeals[index].deal_start_date = e.target.value
+                                setFormData({ ...formData, deals: newDeals })
+                              }}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                            <input
+                              type="date"
+                              value={deal.deal_end_date}
+                              onChange={(e) => {
+                                const newDeals = [...formData.deals]
+                                newDeals[index].deal_end_date = e.target.value
+                                setFormData({ ...formData, deals: newDeals })
+                              }}
+                              min={deal.deal_start_date}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Available Slots (0 = unlimited)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={deal.slots_available}
+                            onChange={(e) => {
+                              const newDeals = [...formData.deals]
+                              newDeals[index].slots_available = e.target.value
+                              setFormData({ ...formData, deals: newDeals })
+                            }}
+                            placeholder="10"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          />
+                          {deal.slots_booked > 0 && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              ⚠️ {deal.slots_booked} slot(s) already booked for this period
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {formData.deals.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newDeals = formData.deals.filter((_, i) => i !== index)
+                            setFormData({ ...formData, deals: newDeals })
+                          }}
+                          className="mt-8 text-red-500 hover:text-red-700"
+                        >
+                          <Minus size={20} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 <div>

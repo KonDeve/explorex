@@ -106,10 +106,10 @@ export default function AdminPackageView() {
   }
 
   const pkg = packageData
-  const accommodationDetails = getDetailsByType('accommodation')
+  // NEW SCHEMA: Updated section types
   const transportationDetails = getDetailsByType('transportation')
-  const activitiesDetails = getDetailsByType('activities')
-  const inclusionsDetails = getDetailsByType('inclusions')
+  const inclusionsDetails = pkg.details?.filter(d => d.section_type === 'inclusions') || []
+  const exclusionsDetails = getDetailsByType('exclusions')
 
   return (
     <div className="min-h-screen bg-white">
@@ -175,88 +175,83 @@ export default function AdminPackageView() {
             <div>
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <MapPin size={14} />
-                <span>{pkg.location}</span>
+                <span>{pkg.location}, {pkg.country}</span>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-4">{pkg.title}</h1>
+              {pkg.description && (
+                <p className="text-gray-700 leading-relaxed">{pkg.description}</p>
+              )}
             </div>
 
           {/* Divider */}
           <hr className="border-t border-gray-200" />
 
-          {/* Hotel Accommodation */}
-          {accommodationDetails && (
+          {/* Deal Periods - NEW SCHEMA (Minimal Design) */}
+          {pkg.deals && pkg.deals.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Hotel Accommodation</h2>
-              {accommodationDetails.description && (
-                <p className="text-gray-700 mb-3">{accommodationDetails.description}</p>
-              )}
-              {accommodationDetails.amenities && accommodationDetails.amenities.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Amenities:</p>
-                  <ul className="space-y-2">
-                    {accommodationDetails.amenities.map((amenity, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                        <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
-                        <span>{amenity}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Available Deal Periods</h2>
+              <div className="space-y-2">
+                {pkg.deals.map((deal, index) => (
+                  <div key={index} className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 rounded-lg transition group">
+                    <div className="flex items-center gap-3">
+                      <Calendar size={16} className="text-gray-400 group-hover:text-blue-500 transition" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {new Date(deal.deal_start_date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                          {' - '}
+                          {new Date(deal.deal_end_date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                          <Users size={12} />
+                          <span>{deal.slots_available - (deal.slots_booked || 0)} slots available</span>
+                          {deal.slots_booked > 0 && (
+                            <span className="text-gray-400">• {deal.slots_booked} booked</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xl font-bold text-gray-900">
+                        ₱{Number(deal.deal_price).toLocaleString()}
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        deal.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {deal.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Transportation */}
+          {/* Divider */}
+          <hr className="border-t border-gray-200" />
+
+          {/* Transportation - NEW SCHEMA (simplified) */}
           {transportationDetails && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">Transportation</h2>
-              {transportationDetails.description && (
-                <p className="text-gray-700 mb-3">{transportationDetails.description}</p>
+              {transportationDetails.local && (
+                <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Local Transportation:</p>
+                  <p className="text-sm text-gray-700">{transportationDetails.local}</p>
+                </div>
               )}
               {transportationDetails.amenities && transportationDetails.amenities.length > 0 && (
-                <ul className="space-y-2 mb-4">
-                  {transportationDetails.amenities.map((amenity, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                      <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
-                      <span>{amenity}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {transportationDetails.local && (
-                <div className="bg-gray-50 rounded-lg p-3 mt-3">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Local Transportation:</p>
-                  <p className="text-sm text-gray-600">{transportationDetails.local}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tour Activities */}
-          {activitiesDetails && (
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Tour Activities</h2>
-              {activitiesDetails.description && (
-                <p className="text-gray-700 mb-3">{activitiesDetails.description}</p>
-              )}
-              {activitiesDetails.tours && activitiesDetails.tours.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Included Tours & Experiences:</p>
-                  <ul className="space-y-2">
-                    {activitiesDetails.tours.map((tour, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                        <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
-                        <span>{tour}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {activitiesDetails.amenities && activitiesDetails.amenities.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Tour Amenities:</p>
-                  <ul className="space-y-2">
-                    {activitiesDetails.amenities.map((amenity, index) => (
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Amenities & Features:</p>
+                  <ul className="grid md:grid-cols-2 gap-2">
+                    {transportationDetails.amenities.map((amenity, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
                         <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
                         <span>{amenity}</span>
@@ -268,18 +263,41 @@ export default function AdminPackageView() {
             </div>
           )}
 
-          {/* Other Inclusions */}
-          {inclusionsDetails && (
+          {/* Inclusions - NEW SCHEMA (consolidated from accommodation) */}
+          {inclusionsDetails.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Other Inclusions</h2>
-              {inclusionsDetails.description && (
-                <p className="text-gray-700 mb-3">{inclusionsDetails.description}</p>
-              )}
-              {inclusionsDetails.items && inclusionsDetails.items.length > 0 && (
-                <ul className="space-y-2">
-                  {inclusionsDetails.items.map((item, index) => (
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Inclusions</h2>
+              <div className="space-y-4">
+                {inclusionsDetails.map((section, sectionIndex) => (
+                  <div key={sectionIndex}>
+                    {section.title && section.title !== 'Inclusions' && (
+                      <h3 className="text-base font-semibold text-gray-800 mb-2">{section.title}</h3>
+                    )}
+                    {section.items && section.items.length > 0 && (
+                      <ul className="grid md:grid-cols-2 gap-2">
+                        {section.items.map((item, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                            <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Exclusions - NEW SCHEMA (consolidated from activities) */}
+          {exclusionsDetails && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Exclusions</h2>
+              {exclusionsDetails.items && exclusionsDetails.items.length > 0 && (
+                <ul className="grid md:grid-cols-2 gap-2">
+                  {exclusionsDetails.items.map((item, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                      <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+                      <span className="text-red-500 flex-shrink-0 mt-0.5">✕</span>
                       <span>{item}</span>
                     </li>
                   ))}
@@ -294,42 +312,27 @@ export default function AdminPackageView() {
           <div className="bg-white rounded-lg border border-gray-200 p-6 sticky top-8">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Trip Details</h3>
             
-            {/* Duration */}
-            <div className="flex items-center gap-3 mb-4">
-              <Calendar className="text-blue-500" size={20} />
-              <div>
-                <p className="text-xs text-gray-500">Duration</p>
-                <p className="text-sm font-semibold text-gray-900">{pkg.duration}</p>
+            {/* Price Range from Deals - NEW SCHEMA */}
+            {pkg.deals && pkg.deals.length > 0 && (
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-2">Price Range</p>
+                {pkg.deals.length === 1 ? (
+                  <div className="text-3xl font-bold text-blue-600">
+                    ₱{Number(pkg.deals[0].deal_price).toLocaleString()}
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold text-blue-600">
+                      ₱{Math.min(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      to ₱{Math.max(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}
+                    </div>
+                  </>
+                )}
+                <p className="text-xs text-gray-500 mt-2">{pkg.deals.length} deal period{pkg.deals.length > 1 ? 's' : ''} available</p>
               </div>
-            </div>
-
-            {/* Group Size */}
-            <div className="flex items-center gap-3 mb-4">
-              <Users className="text-purple-500" size={20} />
-              <div>
-                <p className="text-xs text-gray-500">Group Size</p>
-                <p className="text-sm font-semibold text-gray-900">{pkg.people}</p>
-              </div>
-            </div>
-
-            {/* Rating */}
-            <div className="flex items-center gap-3 mb-6">
-              <Star className="text-yellow-500" size={20} />
-              <div>
-                <p className="text-xs text-gray-500">Rating</p>
-                <p className="text-sm font-semibold text-gray-900">{pkg.rating || 0}/5 Stars</p>
-              </div>
-            </div>
-
-            <div className="border-t pt-4 mb-4">
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-xs text-gray-500">Starting price</span>
-              </div>
-              <div className="text-3xl font-bold text-blue-600 mb-1">
-                {pkg.price || `$${pkg.price_value?.toLocaleString()}`}
-              </div>
-              <p className="text-xs text-gray-500">per person</p>
-            </div>
+            )}
 
             {/* Status & Tags */}
             <div className="border-t pt-4 space-y-2">
@@ -370,50 +373,27 @@ export default function AdminPackageView() {
 
         {/* Additional Sections - Full Width Below Main Content */}
         <div className="space-y-8 mt-8">
-          {/* Highlights */}
-          {pkg.highlights && (
+          {/* Itinerary */}
+          {pkg.itinerary && pkg.itinerary.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-3">Highlights</h2>
-              <p className="text-gray-700 leading-relaxed">{pkg.highlights}</p>
-            </div>
-          )}
-
-        {/* Features */}
-        {pkg.features && pkg.features.length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Features</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {pkg.features.map((feature, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <Check className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
-                  <span className="text-sm text-gray-700">{feature}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Itinerary */}
-        {pkg.itinerary && pkg.itinerary.length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Day by Day Itinerary</h2>
-            <div className="space-y-3">
-              {pkg.itinerary.map((day, index) => (
-                <div key={index} className="border-l-3 border-blue-500 bg-gray-50 rounded-r-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-blue-500 text-white rounded-full w-7 h-7 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
-                      {day.day_number}
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900 mb-1">{day.title}</h3>
-                      <p className="text-sm text-gray-700 leading-relaxed">{day.description}</p>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Day by Day Itinerary</h2>
+              <div className="space-y-3">
+                {pkg.itinerary.map((day, index) => (
+                  <div key={index} className="border-l-4 border-blue-500 bg-gray-50 rounded-r-lg p-4 hover:bg-blue-50 transition">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        {day.day_number}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-gray-900 mb-1">{day.title}</h3>
+                        <p className="text-sm text-gray-700 leading-relaxed">{day.description}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Metadata */}
         <div className="border-t pt-6">
@@ -421,7 +401,7 @@ export default function AdminPackageView() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-500 text-xs">Package ID:</span>
-              <p className="font-mono text-gray-900 mt-1 text-xs">{pkg.id}</p>
+              <p className="font-mono text-gray-900 mt-1 text-xs break-all">{pkg.id}</p>
             </div>
             <div>
               <span className="text-gray-500 text-xs">Created:</span>
@@ -432,8 +412,20 @@ export default function AdminPackageView() {
               <p className="text-gray-700 mt-1">{new Date(pkg.updated_at).toLocaleDateString()}</p>
             </div>
             <div>
+              <span className="text-gray-500 text-xs">Deal Periods:</span>
+              <p className="text-gray-700 mt-1">{pkg.deals?.length || 0} period{pkg.deals?.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div>
               <span className="text-gray-500 text-xs">Detail Sections:</span>
-              <p className="text-gray-700 mt-1">{pkg.details?.length || 0} sections</p>
+              <p className="text-gray-700 mt-1">{pkg.details?.length || 0} section{pkg.details?.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div>
+              <span className="text-gray-500 text-xs">Itinerary Days:</span>
+              <p className="text-gray-700 mt-1">{pkg.itinerary?.length || 0} day{pkg.itinerary?.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div>
+              <span className="text-gray-500 text-xs">Images:</span>
+              <p className="text-gray-700 mt-1">{pkg.images?.length || 0} image{pkg.images?.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { User, Shield, Menu, X, LogIn, UserPlus } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/lib/AuthContext"
+import Notifications from "./notifications"
 
 export default function Header({ activePage = "home" }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -71,6 +72,9 @@ export default function Header({ activePage = "home" }) {
               <div className="w-32 h-10 bg-gray-200 animate-pulse rounded-full"></div>
             ) : isAuthenticated ? (
               <>
+                {/* Notifications Bell */}
+                <Notifications />
+                
                 {isAdmin && (
                   <Link
                     href="/admin/dashboard"
@@ -159,6 +163,11 @@ export default function Header({ activePage = "home" }) {
                 <div className="w-full h-12 bg-gray-200 animate-pulse rounded-lg"></div>
               ) : isAuthenticated ? (
                 <>
+                  {/* Notifications - Mobile View */}
+                  <div className="flex justify-center pb-2">
+                    <Notifications />
+                  </div>
+                  
                   {isAdmin && (
                     <Link
                       href="/admin/dashboard"

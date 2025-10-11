@@ -1,0 +1,278 @@
+{
+  "package_name": "Santorini Romantic Getaway",
+  "schema_version": "NEW (Updated October 2025)",
+  "package_data": {
+    "title": "Santorini Romantic Getaway",
+    "category": "International",
+    "hero_type": "beach",
+    "popular": true,
+    "featured": false,
+    "description": "Experience the magic of Santorini with its iconic blue-domed churches, stunning sunsets, and crystal-clear waters. This 5-day romantic getaway includes luxury accommodation, island tours, and unforgettable dining experiences overlooking the Aegean Sea.",
+    "availability": "Available",
+    "location": "Santorini",
+    "country": "Greece",
+    "images": [
+      "https://example.com/storage/media/package_images/santorini-1.jpg",
+      "https://example.com/storage/media/package_images/santorini-2.jpg",
+      "https://example.com/storage/media/package_images/santorini-3.jpg"
+    ],
+    "deals": [
+      {
+        "deal_start_date": "2025-01-15",
+        "deal_end_date": "2025-01-25",
+        "slots_available": "20",
+        "deal_price": "45000"
+      },
+      {
+        "deal_start_date": "2025-02-01",
+        "deal_end_date": "2025-02-14",
+        "slots_available": "15",
+        "deal_price": "65000"
+      },
+      {
+        "deal_start_date": "2025-03-01",
+        "deal_end_date": "2025-03-31",
+        "slots_available": "25",
+        "deal_price": "55000"
+      }
+    ],
+    "transportation": {
+      "title": "Transportation",
+      "local": "Airport transfers and island hopping boat tours included",
+      "amenities": [
+        "Round-trip airport transfers",
+        "Private boat tour to Red Beach",
+        "Sunset cruise with dinner",
+        "Daily hotel shuttle service"
+      ]
+    },
+    "accommodation": {
+      "title": "Inclusions",
+      "amenities": [
+        "5-night stay at 5-star luxury hotel",
+        "Daily breakfast buffet",
+        "Welcome drinks and fruit basket",
+        "Couples spa treatment (60 minutes)",
+        "Sunset dinner at Oia",
+        "Professional photography session",
+        "Wine tasting at local vineyard",
+        "Travel insurance"
+      ]
+    },
+    "activities": {
+      "title": "Exclusions",
+      "tours": [
+        "International airfare",
+        "Visa fees",
+        "Personal expenses and shopping",
+        "Additional meals and drinks not specified",
+        "Travel insurance upgrades",
+        "Tips and gratuities",
+        "Optional activities and excursions"
+      ]
+    },
+    "itinerary": [
+      {
+        "day": 1,
+        "title": "Arrival & Check-in",
+        "description": "Arrive at Santorini International Airport. Our team will welcome you with a private transfer to your luxury hotel in Fira. Check-in and enjoy welcome drinks while taking in the breathtaking caldera views. Rest of the day at leisure to explore the nearby area or relax by the infinity pool."
+      },
+      {
+        "day": 2,
+        "title": "Fira & Oia Exploration",
+        "description": "After breakfast, explore the charming capital of Fira with its narrow streets, white-washed buildings, and stunning sea views. Visit the Archaeological Museum and browse local shops. In the afternoon, transfer to Oia village, famous for its blue-domed churches and spectacular sunset views. Enjoy a romantic dinner at a cliffside restaurant."
+      },
+      {
+        "day": 3,
+        "title": "Beach Day & Wine Tasting",
+        "description": "Morning boat tour to the famous Red Beach and White Beach. Swim in crystal-clear waters and relax on unique volcanic sand. Afternoon visit to a traditional winery for wine tasting, learning about Santorini's unique viticulture. Return to hotel for couples spa treatment."
+      },
+      {
+        "day": 4,
+        "title": "Sunset Cruise",
+        "description": "Free morning to explore at your own pace or relax at the hotel. In the afternoon, embark on a luxurious sunset catamaran cruise. Sail past the volcano, hot springs, and secluded beaches. Enjoy a BBQ dinner on board while watching the famous Santorini sunset over the Aegean Sea."
+      },
+      {
+        "day": 5,
+        "title": "Photography & Leisure",
+        "description": "Professional photography session at iconic Santorini locations including blue domes, windmills, and caldera views. Capture your memories with stunning backdrops. Afternoon free for last-minute shopping or beach time. Farewell dinner at hotel restaurant."
+      },
+      {
+        "day": 6,
+        "title": "Departure",
+        "description": "Enjoy your final breakfast with a view. Check-out from hotel and private transfer to Santorini International Airport for your departure flight. Take home unforgettable memories of your romantic getaway."
+      }
+    ]
+  },
+  "additional_samples": [
+    {
+      "name": "Boracay Beach Paradise",
+      "data": {
+        "title": "Boracay Beach Paradise",
+        "category": "Domestic",
+        "hero_type": "beach",
+        "popular": true,
+        "featured": true,
+        "description": "Experience the white sand beaches and crystal-clear waters of Boracay. Includes island hopping, water sports, and beachfront accommodation.",
+        "availability": "Limited",
+        "location": "Boracay",
+        "country": "Philippines",
+        "deals": [
+          {
+            "deal_start_date": "2025-01-10",
+            "deal_end_date": "2025-01-20",
+            "slots_available": "10",
+            "deal_price": "18000"
+          },
+          {
+            "deal_start_date": "2025-02-14",
+            "deal_end_date": "2025-02-18",
+            "slots_available": "5",
+            "deal_price": "25000"
+          }
+        ],
+        "transportation": {
+          "title": "Transportation",
+          "local": "Caticlan airport to Boracay ferry and island transfers",
+          "amenities": [
+            "Round-trip ferry tickets",
+            "Island tricycle transfers",
+            "Island hopping boat rental"
+          ]
+        },
+        "accommodation": {
+          "title": "Inclusions",
+          "amenities": [
+            "3-night beachfront resort stay",
+            "Daily breakfast",
+            "Welcome drinks",
+            "Island hopping tour",
+            "Sunset sailing",
+            "Snorkeling equipment"
+          ]
+        },
+        "activities": {
+          "title": "Exclusions",
+          "tours": [
+            "Domestic flights",
+            "Lunch and dinner",
+            "Water sports activities",
+            "Personal expenses",
+            "Environmental fees"
+          ]
+        },
+        "itinerary": [
+          {
+            "day": 1,
+            "title": "Arrival Day",
+            "description": "Arrive at Caticlan Airport, ferry to Boracay, hotel check-in, and beach orientation."
+          },
+          {
+            "day": 2,
+            "title": "Island Hopping",
+            "description": "Full day island hopping tour visiting Crystal Cove, Crocodile Island, and Puka Beach."
+          },
+          {
+            "day": 3,
+            "title": "Beach & Water Sports",
+            "description": "Free day to enjoy White Beach, try water sports, or relax at the resort. Sunset sailing in the evening."
+          },
+          {
+            "day": 4,
+            "title": "Departure",
+            "description": "Final beach time, check-out, and transfer to Caticlan Airport."
+          }
+        ]
+      }
+    },
+    {
+      "name": "Baguio Mountain Retreat",
+      "data": {
+        "title": "Baguio Mountain Retreat",
+        "category": "Domestic",
+        "hero_type": "mountain",
+        "popular": false,
+        "featured": false,
+        "description": "Escape to the cool mountain breeze of Baguio City. Visit strawberry farms, scenic parks, and historic sites in the Summer Capital of the Philippines.",
+        "availability": "Available",
+        "location": "Baguio City",
+        "country": "Philippines",
+        "deals": [
+          {
+            "deal_start_date": "2025-01-05",
+            "deal_end_date": "2025-01-31",
+            "slots_available": "30",
+            "deal_price": "12000"
+          }
+        ],
+        "transportation": {
+          "title": "Transportation",
+          "local": "Round-trip bus from Manila to Baguio",
+          "amenities": [
+            "Air-conditioned bus transportation",
+            "City tour van rental",
+            "Hotel transfers"
+          ]
+        },
+        "accommodation": {
+          "title": "Inclusions",
+          "amenities": [
+            "2-night hotel accommodation",
+            "Daily breakfast",
+            "Baguio city tour",
+            "Strawberry farm visit",
+            "Mines View Park entrance",
+            "Camp John Hay access"
+          ]
+        },
+        "activities": {
+          "title": "Exclusions",
+          "tours": [
+            "Personal expenses",
+            "Lunch and dinner",
+            "Optional horseback riding",
+            "Shopping purchases",
+            "Additional entrance fees"
+          ]
+        },
+        "itinerary": [
+          {
+            "day": 1,
+            "title": "Manila to Baguio",
+            "description": "Early morning departure from Manila. Scenic drive through mountain roads. Arrive in Baguio, hotel check-in, and afternoon city tour."
+          },
+          {
+            "day": 2,
+            "title": "Baguio Attractions",
+            "description": "Visit Mines View Park, Botanical Garden, The Mansion, Wright Park, and Burnham Park. Afternoon at Strawberry Farm and Good Shepherd."
+          },
+          {
+            "day": 3,
+            "title": "Return to Manila",
+            "description": "Morning at Session Road for shopping, lunch, check-out, and return trip to Manila."
+          }
+        ]
+      }
+    }
+  ],
+  "notes": {
+    "removed_fields": [
+      "people (capacity is now per-deal via slots_available)",
+      "price (pricing is now per-deal via deal_price)",
+      "price_value (use deal_price instead)",
+      "rating (calculated from reviews table)",
+      "reviews_count (calculated from reviews table)",
+      "highlights (not used in current form)",
+      "features (not used in current form)"
+    ],
+    "new_fields": [
+      "deal_price in each deal object (individual pricing per deal period in PHP)"
+    ],
+    "simplified_sections": [
+      "transportation - no description field",
+      "inclusions - consolidated from accommodation",
+      "exclusions - consolidated from activities"
+    ],
+    "pricing_structure": "Each deal period has its own price. Different date ranges can have different prices (e.g., peak season vs off-season, weekday vs weekend)."
+  }
+}

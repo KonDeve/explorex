@@ -138,25 +138,26 @@ export default function AdminPackages() {
           </button>
         </div>
       ) : viewMode === "grid" ? (
-        // Grid View
+        // Grid View - Modern Card Layout
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packages.map((pkg) => (
-            <div key={pkg.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden group">
+            <div key={pkg.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300">
               {/* Image */}
-              <div className="relative h-48 overflow-hidden">
+              <div className="relative h-56 overflow-hidden">
                 <img
                   src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg"}
                   alt={pkg.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-cover"
                 />
-                <div className="absolute top-3 right-3">
+                {/* Status Badge */}
+                <div className="absolute top-4 right-4">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
                       pkg.availability === "Available"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-green-500/90 text-white"
                         : pkg.availability === "Limited"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
+                          ? "bg-yellow-500/90 text-white"
+                          : "bg-red-500/90 text-white"
                     }`}
                   >
                     {pkg.availability}
@@ -165,33 +166,59 @@ export default function AdminPackages() {
               </div>
 
               {/* Content */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{pkg.title}</h3>
+              <div className="p-5">
+                {/* Title */}
+                <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2">
+                  {pkg.title}
+                </h3>
 
-                <div className="space-y-2 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin size={16} className="text-gray-400" />
-                    <span>{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar size={16} className="text-gray-400" />
-                    <span>{pkg.duration}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Users size={16} className="text-gray-400" />
-                    <span>{pkg.people || 2} People</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                    <DollarSign size={16} className="text-gray-400" />
-                    <span>{pkg.price || `$${pkg.price_value?.toLocaleString()}`}</span>
-                  </div>
+                {/* Location */}
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                  <MapPin size={16} className="text-gray-400 flex-shrink-0" />
+                  <span className="line-clamp-1">{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                 </div>
+
+                {/* Category Badge */}
+                {pkg.category && (
+                  <div className="mb-3">
+                    <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium ${
+                      pkg.category === 'International' 
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                    }`}>
+                      {pkg.category}
+                    </span>
+                  </div>
+                )}
+
+                {/* Deal Info */}
+                {pkg.deals && pkg.deals.length > 0 && (
+                  <div className="space-y-2 mb-4 pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Calendar size={14} className="text-gray-400" />
+                      <span>{pkg.deals.length} deal period{pkg.deals.length > 1 ? 's' : ''} available</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-bold text-gray-900">
+                        {pkg.deals.length === 1 
+                          ? `₱${Number(pkg.deals[0].deal_price).toLocaleString()}`
+                          : `₱${Math.min(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}`
+                        }
+                      </span>
+                      {pkg.deals.length > 1 && (
+                        <span className="text-sm text-gray-500">
+                          - ₱{Math.max(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditPackage(pkg)}
-                    className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition flex items-center justify-center gap-2 font-semibold text-sm"
+                    className="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 font-medium text-sm"
                   >
                     <Edit size={16} />
                     Edit
@@ -201,13 +228,15 @@ export default function AdminPackages() {
                       sessionStorage.setItem('viewPackageId', pkg.id)
                       router.push('/admin/packages/view')
                     }}
-                    className="bg-gray-50 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+                    className="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-200 transition"
+                    title="View Details"
                   >
                     <Eye size={16} />
                   </button>
                   <button 
                     onClick={() => handleDeletePackage(pkg.id)}
-                    className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition"
+                    className="bg-red-50 text-red-600 px-4 py-2.5 rounded-lg hover:bg-red-100 transition"
+                    title="Delete Package"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -225,9 +254,9 @@ export default function AdminPackages() {
                 <tr>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Package</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Location</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Duration</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Price</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">People</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Category</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Price Range</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Deals</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Status</th>
                   <th className="text-left py-4 px-6 text-sm font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -248,11 +277,33 @@ export default function AdminPackages() {
                     <td className="py-4 px-6 text-sm text-gray-600">
                       {pkg.location}{pkg.country ? `, ${pkg.country}` : ''}
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{pkg.duration}</td>
-                    <td className="py-4 px-6 text-sm font-semibold text-gray-900">
-                      {pkg.price || `$${pkg.price_value?.toLocaleString()}`}
+                    <td className="py-4 px-6 text-sm">
+                      {pkg.category && (
+                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                          pkg.category === 'International' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {pkg.category}
+                        </span>
+                      )}
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{pkg.people || 2} People</td>
+                    <td className="py-4 px-6 text-sm font-semibold text-gray-900">
+                      {pkg.deals && pkg.deals.length > 0 ? (
+                        pkg.deals.length === 1 
+                          ? `₱${Number(pkg.deals[0].deal_price).toLocaleString()}`
+                          : `₱${Math.min(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()} - ₱${Math.max(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}`
+                      ) : (
+                        <span className="text-gray-400 font-normal">No deals</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-600">
+                      {pkg.deals && pkg.deals.length > 0 ? (
+                        <span>{pkg.deals.length} period{pkg.deals.length > 1 ? 's' : ''}</span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="py-4 px-6">
                       <span
                         className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${

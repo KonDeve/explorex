@@ -12,14 +12,11 @@ export default function PackagesPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [priceRange, setPriceRange] = useState("All")
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedDates, setSelectedDates] = useState([])
   const [expandedFilters, setExpandedFilters] = useState({
     search: true,
-    availability: false,
     category: false,
     priceRange: false
   })
-  const [currentSlide, setCurrentSlide] = useState(0)
   const [heroFilter, setHeroFilter] = useState("All")
   const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -94,12 +91,21 @@ export default function PackagesPage() {
     
     const matchesCategory = selectedCategory === "All" || pkg.category === selectedCategory
     
-    const packagePrice = pkg.price_value || parseInt(pkg.price?.replace(/[$,]/g, '')) || 0
+    // Get the price from deals or price_value
+    let packagePrice = 0
+    if (pkg.deals && pkg.deals.length > 0) {
+      // Use the minimum deal price
+      packagePrice = Math.min(...pkg.deals.map(d => Number(d.deal_price) || 0))
+    } else {
+      packagePrice = pkg.price_value || 0
+    }
+    
+    // Price filtering in Peso (₱)
     const matchesPrice = priceRange === "All" ||
-      (priceRange === "Under $1,500" && packagePrice < 1500) ||
-      (priceRange === "$1,500 - $2,500" && packagePrice >= 1500 && packagePrice <= 2500) ||
-      (priceRange === "$2,500 - $3,500" && packagePrice > 2500 && packagePrice <= 3500) ||
-      (priceRange === "Above $3,500" && packagePrice > 3500)
+      (priceRange === "Under ₱50,000" && packagePrice < 50000) ||
+      (priceRange === "₱50,000 - ₱100,000" && packagePrice >= 50000 && packagePrice <= 100000) ||
+      (priceRange === "₱100,000 - ₱150,000" && packagePrice > 100000 && packagePrice <= 150000) ||
+      (priceRange === "Above ₱150,000" && packagePrice > 150000)
 
     // Hero filter logic - simplified for now, can be enhanced based on package categories
     const matchesHeroFilter = heroFilter === "All" || 
@@ -110,28 +116,8 @@ export default function PackagesPage() {
 
     return matchesSearch && matchesCategory && matchesPrice && matchesHeroFilter
   })
-
-  // Use top-rated packages for carousel
-  const carouselData = packages.length > 0 
-    ? packages.slice(0, 4).map(pkg => ({
-        ...pkg,
-        image: pkg.images && pkg.images.length > 0 ? pkg.images[0] : "/placeholder.svg",
-        reviews: pkg.reviews_count || 0
-      }))
-    : []
   
   const regularPackages = filteredPackages
-
-  // Carousel auto-slide effect
-  useEffect(() => {
-    if (carouselData.length === 0) return
-    
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % carouselData.length)
-    }, 5000) // Change slide every 5 seconds for better viewing time
-
-    return () => clearInterval(interval)
-  }, [carouselData.length])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -173,226 +159,6 @@ export default function PackagesPage() {
           </div>
         </div>
       </section>
-
-      {/* Carousel Section */}
-      <section className="container mx-auto px-4 lg:px-8 py-16">
-        <div className="relative h-96 lg:h-[500px] rounded-3xl overflow-hidden shadow-2xl">
-          {carouselData.map((slide, index) => (
-            <div
-              key={slide.id}
-              className={`absolute inset-0 transition-all duration-[1500ms] ${
-                index === currentSlide 
-                  ? 'opacity-100 scale-100 z-10' 
-                  : 'opacity-0 scale-105 z-0'
-              }`}
-              style={{
-                transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
-              }}
-            >
-              {/* Background Image with Parallax Effect */}
-              <div className="absolute inset-0 will-change-transform">
-                <img
-                  src={slide.image}
-                  alt={slide.title}
-                  className={`w-full h-full object-cover transition-all duration-[1500ms] will-change-transform ${
-                    index === currentSlide ? 'scale-100' : 'scale-110'
-                  }`}
-                  style={{
-                    transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-                  }}
-                />
-                <div className={`absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-black/50 transition-all duration-[1500ms] ${
-                  index === currentSlide ? 'opacity-100' : 'opacity-0'
-                }`} 
-                style={{
-                  transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
-                }} />
-              </div>
-
-              {/* Content */}
-              <div className="relative h-full flex items-center z-20">
-                <div className="container mx-auto px-8 lg:px-16">
-                  <div className="max-w-3xl text-white">
-                    {/* Badges */}
-                    <div className={`mb-6 flex gap-3 will-change-transform transition-all duration-700 ${
-                      index === currentSlide 
-                        ? 'translate-y-0 opacity-100 blur-0' 
-                        : 'translate-y-8 opacity-0 blur-sm'
-                    }`}
-                    style={{
-                      transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      transitionDelay: index === currentSlide ? '200ms' : '0ms'
-                    }}>
-                      {slide.featured ? (
-                        <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg backdrop-blur-sm border border-white/20 hover:scale-105 transition-all duration-300">
-                          <Sparkles size={14} />
-                          Featured Package
-                        </div>
-                      ) : (
-                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg backdrop-blur-sm border border-white/20 hover:scale-105 transition-all duration-300">
-                          Premium Experience
-                        </div>
-                      )}
-                      <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-full flex items-center gap-2 text-gray-900 shadow-lg border border-white/20 hover:scale-105 hover:bg-white transition-all duration-300">
-                        <Star className="fill-yellow-400 text-yellow-400" size={16} />
-                        <span className="font-bold text-sm">{slide.rating}</span>
-                        <span className="text-xs text-gray-600">({slide.reviews})</span>
-                      </div>
-                    </div>
-                    
-                    <h2 className={`text-4xl lg:text-6xl font-bold mb-6 leading-tight will-change-transform transition-all duration-1000 ${
-                      index === currentSlide 
-                        ? 'translate-y-0 opacity-100 scale-100 blur-0' 
-                        : 'translate-y-16 opacity-0 scale-95 blur-sm'
-                    }`}
-                    style={{
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                      transitionDelay: index === currentSlide ? '400ms' : '0ms'
-                    }}>
-                      {slide.title}
-                    </h2>
-                    
-                    <p className={`text-xl lg:text-2xl mb-8 text-white/90 leading-relaxed will-change-transform transition-all duration-900 ${
-                      index === currentSlide 
-                        ? 'translate-y-0 opacity-100 blur-0' 
-                        : 'translate-y-12 opacity-0 blur-sm'
-                    }`}
-                    style={{
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                      transitionDelay: index === currentSlide ? '600ms' : '0ms'
-                    }}>
-                      {slide.features.join(' • ')}
-                    </p>
-
-                    {/* Package Details */}
-                    <div className={`flex flex-wrap gap-8 mb-10 will-change-transform transition-all duration-800 ${
-                      index === currentSlide 
-                        ? 'translate-y-0 opacity-100 blur-0' 
-                        : 'translate-y-10 opacity-0 blur-sm'
-                    }`}
-                    style={{
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                      transitionDelay: index === currentSlide ? '800ms' : '0ms'
-                    }}>
-                      <div className={`flex items-center gap-3 will-change-transform transition-all duration-600 ${
-                        index === currentSlide ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
-                      }`}
-                      style={{
-                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: index === currentSlide ? '1000ms' : '0ms'
-                      }}>
-                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 hover:scale-110 transition-all duration-300 border border-white/30 shadow-lg">
-                          <MapPin size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <div className="text-sm text-white/70 font-medium">Location</div>
-                          <div className="font-bold text-lg">{slide.location}</div>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-3 will-change-transform transition-all duration-600 ${
-                        index === currentSlide ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
-                      }`}
-                      style={{
-                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: index === currentSlide ? '1100ms' : '0ms'
-                      }}>
-                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 hover:scale-110 transition-all duration-300 border border-white/30 shadow-lg">
-                          <Calendar size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <div className="text-sm text-white/70 font-medium">Duration</div>
-                          <div className="font-bold text-lg">{slide.duration}</div>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-3 will-change-transform transition-all duration-600 ${
-                        index === currentSlide ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
-                      }`}
-                      style={{
-                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: index === currentSlide ? '1200ms' : '0ms'
-                      }}>
-                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 hover:scale-110 transition-all duration-300 border border-white/30 shadow-lg">
-                          <Users size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <div className="text-sm text-white/70 font-medium">Group Size</div>
-                          <div className="font-bold text-lg">{slide.people}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Price and CTA */}
-                    <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-8 will-change-transform transition-all duration-800 ${
-                      index === currentSlide 
-                        ? 'translate-y-0 opacity-100 blur-0' 
-                        : 'translate-y-10 opacity-0 blur-sm'
-                    }`}
-                    style={{
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                      transitionDelay: index === currentSlide ? '1400ms' : '0ms'
-                    }}>
-                      <div className={`will-change-transform transition-all duration-700 ${
-                        index === currentSlide 
-                          ? 'translate-x-0 opacity-100 scale-100' 
-                          : 'translate-x-12 opacity-0 scale-95'
-                      }`}
-                      style={{
-                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: index === currentSlide ? '1600ms' : '0ms'
-                      }}>
-                        <div className="text-sm text-white/70 mb-2 font-medium uppercase tracking-wide">Starting from</div>
-                        <div className="text-5xl lg:text-6xl font-bold bg-gradient-to-br from-white to-white/90 bg-clip-text text-transparent">{slide.price}</div>
-                        <div className="text-sm text-white/70 font-medium">per person</div>
-                      </div>
-                      <div className={`will-change-transform transition-all duration-700 ${
-                        index === currentSlide 
-                          ? 'translate-x-0 opacity-100 scale-100' 
-                          : 'translate-x-12 opacity-0 scale-95'
-                      }`}
-                      style={{
-                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: index === currentSlide ? '1800ms' : '0ms'
-                      }}>
-                        <Link href={`/packages/${slide.slug || 'default'}`}>
-                          <button className="bg-gradient-to-r from-white to-gray-50 text-gray-900 px-10 py-4 rounded-full font-bold hover:from-gray-50 hover:to-white transition-all inline-flex items-center gap-3 hover:scale-105 group shadow-2xl border border-white/20 backdrop-blur-sm">
-                            <span>View Details</span>
-                            <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform duration-300" />
-                          </button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {/* Navigation Dots */}
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 z-30">
-            {carouselData.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`relative rounded-full transition-all duration-700 hover:scale-125 ${
-                  index === currentSlide 
-                    ? 'w-12 h-3 bg-white shadow-2xl' 
-                    : 'w-3 h-3 bg-white/60 hover:bg-white/80'
-                }`}
-                style={{
-                  transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
-                }}
-              >
-                {index === currentSlide && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/80 via-white to-white/80 rounded-full animate-pulse" />
-                )}
-              </button>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-
 
       <section
         id="packages"
@@ -450,89 +216,6 @@ export default function PackagesPage() {
                 )}
               </div>
 
-              {/* Availability Filter */}
-              <div className="border-b border-gray-100">
-                <button
-                  onClick={() => setExpandedFilters(prev => ({ ...prev, availability: !prev.availability }))}
-                  className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Calendar size={18} className="text-gray-600" />
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Availability</h3>
-                  </div>
-                  <ChevronDown 
-                    size={18} 
-                    className={`text-gray-400 transition-transform ${expandedFilters.availability ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                
-                {expandedFilters.availability && (
-                  <div className="px-6 pb-6">
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <button className="p-1 hover:bg-gray-200 rounded">
-                          <ChevronDown size={16} className="rotate-90 text-gray-600" />
-                        </button>
-                        <div className="text-center">
-                          <div className="text-sm font-semibold text-gray-900">February 2025</div>
-                        </div>
-                        <button className="p-1 hover:bg-gray-200 rounded">
-                          <ChevronDown size={16} className="-rotate-90 text-gray-600" />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) => (
-                          <div key={day} className="p-2 font-semibold text-gray-500">{day}</div>
-                        ))}
-                      </div>
-                      
-                      <div className="grid grid-cols-7 gap-1 text-center text-sm">
-                        {Array.from({length: 28}, (_, i) => {
-                          const date = i + 1;
-                          const isSelected = selectedDates.includes(date);
-                          const isInRange = date >= 10 && date <= 15;
-                          
-                          return (
-                            <button
-                              key={date}
-                              onClick={() => {
-                                if (selectedDates.includes(date)) {
-                                  setSelectedDates(selectedDates.filter(d => d !== date));
-                                } else {
-                                  setSelectedDates([...selectedDates, date]);
-                                }
-                              }}
-                              className={`p-2 rounded-lg cursor-pointer transition-all text-xs font-medium ${
-                                isSelected
-                                  ? 'bg-blue-500 text-white'
-                                  : isInRange
-                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                  : 'text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              {date}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      
-                      <div className="flex gap-2 mt-4">
-                        <button 
-                          onClick={() => setSelectedDates([])}
-                          className="flex-1 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                        >
-                          Clear
-                        </button>
-                        <button className="flex-1 py-2 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600 transition-colors">
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Category Filter */}
               <div className="border-b border-gray-100">
                 <button
@@ -574,7 +257,7 @@ export default function PackagesPage() {
                     {/* Traditional Category Filter */}
                     <div className="space-y-3 pt-4 border-t border-gray-100">
                       <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Package Type</h4>
-                      {['All', 'International', 'Domestic'].map((category) => (
+                      {['All', 'Adventure', 'Beach', 'City', 'Cultural', 'Luxury', 'Nature'].map((category) => (
                         <label key={category} className="flex items-center gap-3 cursor-pointer group">
                           <div className="relative">
                             <input
@@ -614,7 +297,7 @@ export default function PackagesPage() {
                   className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-600 text-lg">$</span>
+                    <span className="text-gray-600 text-lg">₱</span>
                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Price Range</h3>
                   </div>
                   <ChevronDown 
@@ -628,10 +311,10 @@ export default function PackagesPage() {
                     <div className="space-y-3">
                       {[
                         'All',
-                        'Under $1,500',
-                        '$1,500 - $2,500',
-                        '$2,500 - $3,500', 
-                        'Above $3,500'
+                        'Under ₱50,000',
+                        '₱50,000 - ₱100,000',
+                        '₱100,000 - ₱150,000', 
+                        'Above ₱150,000'
                       ].map((range) => (
                         <label key={range} className="flex items-center gap-3 cursor-pointer group">
                           <div className="relative">
@@ -672,7 +355,6 @@ export default function PackagesPage() {
                     setSearchQuery("")
                     setSelectedCategory("All")
                     setPriceRange("All")
-                    setSelectedDates([])
                     setHeroFilter("All")
                   }}
                   className="w-full py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
@@ -783,7 +465,13 @@ export default function PackagesPage() {
 
                   {/* Price Badge - Top Left */}
                   <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-lg font-bold text-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-blue-600 shadow-lg">
-                    {pkg.price || `$${pkg.price_value?.toLocaleString()}`}
+                    {pkg.deals && pkg.deals.length > 0 
+                      ? (pkg.deals.length === 1 
+                          ? `₱${Number(pkg.deals[0].deal_price).toLocaleString()}`
+                          : `₱${Math.min(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}+`
+                        )
+                      : pkg.price || `$${pkg.price_value?.toLocaleString()}`
+                    }
                   </div>
 
                   {/* Popular Badge - Top Right */}
@@ -798,35 +486,59 @@ export default function PackagesPage() {
                     <h3 className="text-xl font-bold mb-2 leading-tight transition-all duration-300 group-hover:text-2xl">
                       {pkg.title.toUpperCase()}
                     </h3>
-                    <p className="text-sm text-white/90 mb-3 line-clamp-2 transition-all duration-300 group-hover:text-base group-hover:text-white">
-                      {pkg.features && pkg.features.length > 0 ? pkg.features.join(', ') : pkg.highlights || 'Explore this amazing destination'}
-                    </p>
+                    {pkg.description && (
+                      <p className="text-sm text-white/90 mb-3 line-clamp-2 transition-all duration-300 group-hover:text-base group-hover:text-white">
+                        {pkg.description}
+                      </p>
+                    )}
                     
-                    {/* Location and Duration Tags */}
-                    <div className="flex gap-2 mb-3 transition-all duration-300">
+                    {/* Location and Category Tags */}
+                    <div className="flex gap-2 mb-3 transition-all duration-300 flex-wrap">
                       <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
                         <MapPin size={12} className="transition-all duration-300 group-hover:scale-110" />
-                        <span className="text-xs font-medium">{pkg.location}</span>
+                        <span className="text-xs font-medium">{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                       </div>
-                      <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
-                        <Calendar size={12} className="transition-all duration-300 group-hover:scale-110" />
-                        <span className="text-xs font-medium">{pkg.duration}</span>
-                      </div>
+                      {pkg.category && (
+                        <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
+                          <span className="text-xs font-medium">{pkg.category}</span>
+                        </div>
+                      )}
+                      {/* Deal Dates Badge - Show first available deal or count */}
+                      {pkg.deals && pkg.deals.length > 0 && pkg.deals.some(d => d.deal_start_date && d.deal_end_date) && (
+                        <div className="flex items-center gap-1 bg-green-500/90 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-green-500 group-hover:scale-105">
+                          <Calendar size={12} className="transition-all duration-300 group-hover:scale-110" />
+                          <span className="text-xs font-medium">
+                            {pkg.deals.length} {pkg.deals.length === 1 ? 'deal' : 'deals'} available
+                          </span>
+                        </div>
+                      )}
+                      {/* Slots Available Badge - Show minimum slots from all deals */}
+                      {/* {pkg.deals && pkg.deals.length > 0 && pkg.deals.some(d => d.slots_available > 0) && (
+                        (() => {
+                          const minSlots = Math.min(...pkg.deals.filter(d => d.slots_available > 0).map(d => d.slots_available - (d.slots_booked || 0)))
+                          return minSlots > 0 ? (
+                            <div className="flex items-center gap-1 bg-orange-500/90 backdrop-blur-sm rounded-full px-2 py-1 transition-all duration-300 group-hover:bg-orange-500 group-hover:scale-105">
+                              <Users size={12} className="transition-all duration-300 group-hover:scale-110" />
+                              <span className="text-xs font-medium">
+                                {minSlots} slots left
+                              </span>
+                            </div>
+                          ) : null
+                        })()
+                      )} */}
                     </div>
 
-                    {/* Rating and Additional Info */}
+                    {/* Rating */}
                     <div className="flex items-center justify-between transition-all duration-300">
-                      <div className="flex items-center gap-2 transition-all duration-300 group-hover:scale-105">
-                        <div className="flex items-center gap-1">
-                          <Star className="fill-yellow-400 text-yellow-400 transition-all duration-300 group-hover:scale-110" size={14} />
-                          <span className="font-bold text-sm transition-all duration-300 group-hover:text-base">{pkg.rating || 0}</span>
-                          <span className="text-xs text-white/80 transition-all duration-300 group-hover:text-sm group-hover:text-white/90">({pkg.reviews_count || 0})</span>
+                      {(pkg.rating || pkg.reviews_count) && (
+                        <div className="flex items-center gap-2 transition-all duration-300 group-hover:scale-105">
+                          <div className="flex items-center gap-1">
+                            <Star className="fill-yellow-400 text-yellow-400 transition-all duration-300 group-hover:scale-110" size={14} />
+                            <span className="font-bold text-sm transition-all duration-300 group-hover:text-base">{pkg.rating || 0}</span>
+                            <span className="text-xs text-white/80 transition-all duration-300 group-hover:text-sm group-hover:text-white/90">({pkg.reviews_count || 0})</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs transition-all duration-300 group-hover:text-sm group-hover:scale-105">
-                        <Users size={12} className="transition-all duration-300 group-hover:scale-110" />
-                        <span>{pkg.people || 2} People</span>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

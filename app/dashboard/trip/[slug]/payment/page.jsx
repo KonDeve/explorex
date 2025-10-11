@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { getPackageBySlug } from "@/lib/packages"
 import { getUserBookings } from "@/lib/bookings"
 import { useAuth } from "@/lib/AuthContext"
+import { createCheckoutSession } from "@/lib/paymongo"
 
 export default function PaymentPage({ params }) {
   const { slug } = params
@@ -17,6 +18,7 @@ export default function PaymentPage({ params }) {
   const [error, setError] = useState(null)
   const [paymentOption, setPaymentOption] = useState('full')
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // Fetch booking and package data
   useEffect(() => {
@@ -54,6 +56,60 @@ export default function PaymentPage({ params }) {
     }, 100)
     return () => clearTimeout(timer)
   }, [])
+
+  const handlePayment = async () => {
+    if (!booking || !packageData || !user) return
+
+    setIsProcessing(true)
+    try {
+      const paymentAmount = paymentOption === 'full' ? booking.remaining_balance : partialPayment
+      
+      // Build image URL - only include if it's a full URL
+      const imageUrl = packageData.images?.[0]
+      const fullImageUrl = imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))
+        ? imageUrl
+        : null
+      
+      // Create PayMongo checkout session
+      const result = await createCheckoutSession({
+        amount: paymentAmount,
+        description: `Payment for ${packageData.title}`,
+        lineItems: [
+          {
+            name: `${packageData.title} - ${paymentOption === 'full' ? 'Full Payment' : 'Down Payment (30%)'}`,
+            quantity: 1,
+            amount: paymentAmount,
+            description: `${booking.check_in_date} to ${booking.check_out_date} | ${booking.total_guests} Guests`,
+            images: fullImageUrl ? [fullImageUrl] : []
+          }
+        ],
+        billing: {
+          name: user.user_metadata?.full_name || user.email,
+          email: user.email
+        },
+        // Store session ID in localStorage to retrieve on success page
+        successUrl: `${window.location.origin}/dashboard/trip/${slug}/payment/success?booking_id=${booking.id}`,
+        cancelUrl: `${window.location.origin}/dashboard/trip/${slug}/payment`
+      })
+
+      if (result.success && result.checkoutUrl) {
+        // Store session ID in localStorage for retrieval on success page
+        localStorage.setItem('paymongo_session_id', result.sessionId)
+        localStorage.setItem('paymongo_booking_id', booking.id)
+        
+        // Redirect to PayMongo checkout page
+        window.location.href = result.checkoutUrl
+      } else {
+        console.error('Failed to create checkout session:', result.error)
+        alert('Failed to initiate payment. Please try again.')
+        setIsProcessing(false)
+      }
+    } catch (err) {
+      console.error('Payment error:', err)
+      alert('An error occurred. Please try again.')
+      setIsProcessing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -378,12 +434,23 @@ export default function PaymentPage({ params }) {
               <div className={`transition-all duration-500 ease-out delay-700 ${
                 isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
               }`}>
-                <Link href={`/dashboard/trip/${slug}/payment/success`}>
-                  <button className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
-                    <Lock size={20} />
-                    Complete {paymentOption === 'full' ? 'Payment' : 'Down Payment'}
-                  </button>
-                </Link>
+                <button 
+                  onClick={handlePayment}
+                  disabled={isProcessing}
+                  className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={20} />
+                      Complete {paymentOption === 'full' ? 'Payment' : 'Down Payment'}
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Terms */}

@@ -7,10 +7,13 @@ import { useState, useEffect, useRef } from "react"
 import { getPackageBySlug } from "@/lib/packages"
 import { getUserBookings } from "@/lib/bookings"
 import { useAuth } from "@/lib/AuthContext"
+import { createCheckoutSession } from "@/lib/paymongo"
+import { useRouter } from "next/navigation"
 
 export default function TripDetailsPage({ params }) {
   const { slug } = params
   const { user } = useAuth()
+  const router = useRouter()
   const [booking, setBooking] = useState(null)
   const [packageData, setPackageData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -19,6 +22,7 @@ export default function TripDetailsPage({ params }) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [tabContentLoaded, setTabContentLoaded] = useState(false)
   const [isVisible, setIsVisible] = useState({})
+  const [processingPayment, setProcessingPayment] = useState(false)
 
   // Fetch booking and package data
   useEffect(() => {
@@ -36,7 +40,11 @@ export default function TripDetailsPage({ params }) {
         const result = await getUserBookings(user.id)
         if (result.success) {
           const foundBooking = result.bookings.find(b => b.package?.slug === slug)
-          setBooking(foundBooking)
+          // Remove the package object from booking to avoid rendering issues
+          if (foundBooking) {
+            const { package: pkg, ...bookingWithoutPackage } = foundBooking
+            setBooking(bookingWithoutPackage)
+          }
         }
       } catch (err) {
         console.error('Error fetching trip data:', err)
@@ -87,6 +95,372 @@ export default function TripDetailsPage({ params }) {
     setTimeout(() => {
       setTabContentLoaded(true)
     }, 50)
+  }
+
+  // Handle payment checkout
+  const handlePayNow = async () => {
+    if (!booking || !packageData) return
+
+    const remainingBalance = parseFloat(booking.remaining_balance || 0)
+    
+    if (remainingBalance <= 0) {
+      alert('No remaining balance to pay')
+      return
+    }
+
+    // Check payment deadline (45 days before travel)
+    const checkInDate = new Date(booking.check_in_date)
+    checkInDate.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const paymentDeadline = new Date(checkInDate)
+    paymentDeadline.setDate(paymentDeadline.getDate() - 45)
+    const daysUntilDeadline = Math.ceil((paymentDeadline - today) / (1000 * 60 * 60 * 24))
+
+    if (daysUntilDeadline < 0) {
+      alert(
+        `This booking cannot be paid. The payment deadline was ${paymentDeadline.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ` +
+        `(${Math.abs(daysUntilDeadline)} ${Math.abs(daysUntilDeadline) === 1 ? 'day' : 'days'} ago).\n\n` +
+        `This booking will be automatically cancelled and is non-refundable.`
+      )
+      return
+    }
+
+    setProcessingPayment(true)
+
+    try {
+      const packageImage = packageData.images?.[0]
+      const fullImageUrl = packageImage && (packageImage.startsWith('http://') || packageImage.startsWith('https://'))
+        ? packageImage
+        : null
+
+      const result = await createCheckoutSession({
+        amount: remainingBalance,
+        description: `Remaining Balance Payment - ${packageData.title}`,
+        lineItems: [
+          {
+            name: `${packageData.title} - Remaining Balance`,
+            quantity: 1,
+            amount: remainingBalance,
+            description: `Booking ${booking.booking_number} | ${booking.check_in_date} to ${booking.check_out_date}`,
+            images: fullImageUrl ? [fullImageUrl] : []
+          }
+        ],
+        billing: {
+          name: `${booking.customer_first_name} ${booking.customer_last_name}`,
+          email: booking.customer_email
+        },
+        successUrl: `${window.location.origin}/dashboard/trip/${slug}/payment/success?booking_id=${booking.id}`,
+        cancelUrl: `${window.location.origin}/dashboard/trip/${slug}`
+      })
+
+      if (result.success && result.checkoutUrl) {
+        localStorage.setItem('paymongo_session_id', result.sessionId)
+        localStorage.setItem('paymongo_booking_id', booking.id)
+        
+        // Redirect to PayMongo checkout
+        window.location.href = result.checkoutUrl
+      } else {
+        console.error('Failed to create checkout session:', result.error)
+        alert('Failed to initiate payment. Please try again.')
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      alert('An error occurred. Please try again.')
+    } finally {
+      setProcessingPayment(false)
+    }
+  }
+
+  // Download Receipt PDF
+  const downloadReceipt = async () => {
+    try {
+      const pdfMakeModule = await import('pdfmake/build/pdfmake')
+      const pdfFontsModule = await import('pdfmake/build/vfs_fonts')
+      const pdfMake = pdfMakeModule.default
+      
+      // Properly assign vfs fonts
+      if (pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
+        pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs
+      }
+
+      const receiptNumber = `RCP-${booking.booking_number}`
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+
+      const docDefinition = {
+        content: [
+          // Header
+          {
+            columns: [
+              {
+                width: '*',
+                stack: [
+                  { text: 'Xplorex Travel', style: 'header', color: '#2563eb' },
+                  { text: 'Receipt', style: 'subheader' }
+                ]
+              },
+              {
+                width: 'auto',
+                stack: [
+                  { text: receiptNumber, style: 'receiptNumber' },
+                  { text: currentDate, style: 'date' }
+                ]
+              }
+            ],
+            margin: [0, 0, 0, 20]
+          },
+          
+          // Customer Info
+          { text: 'Customer Information', style: 'sectionHeader' },
+          {
+            columns: [
+              { text: 'Name:', bold: true, width: 80 },
+              { text: user?.email || 'N/A', width: '*' }
+            ],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              { text: 'Booking ID:', bold: true, width: 80 },
+              { text: booking.booking_number, width: '*' }
+            ],
+            margin: [0, 0, 0, 20]
+          },
+
+          // Booking Details
+          { text: 'Booking Details', style: 'sectionHeader' },
+          {
+            columns: [
+              { text: 'Package:', bold: true, width: 80 },
+              { text: packageData.title, width: '*' }
+            ],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              { text: 'Location:', bold: true, width: 80 },
+              { text: `${packageData.location}, ${packageData.country || ''}`, width: '*' }
+            ],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              { text: 'Check-in:', bold: true, width: 80 },
+              { text: booking.check_in_date, width: '*' }
+            ],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              { text: 'Check-out:', bold: true, width: 80 },
+              { text: booking.check_out_date, width: '*' }
+            ],
+            margin: [0, 0, 0, 20]
+          },
+
+          // Payment Details
+          { text: 'Payment Details', style: 'sectionHeader' },
+          {
+            style: 'table',
+            table: {
+              widths: ['*', 100],
+              body: [
+                [{ text: 'Total Amount', bold: true }, { text: `₱${booking.total_amount.toLocaleString()}`, alignment: 'right' }],
+                [{ text: 'Amount Paid', bold: true }, { text: `₱${booking.amount_paid.toLocaleString()}`, alignment: 'right', color: '#16a34a' }],
+                [{ text: 'Remaining Balance', bold: true }, { text: `₱${booking.remaining_balance.toLocaleString()}`, alignment: 'right', color: '#dc2626' }]
+              ]
+            },
+            layout: {
+              hLineWidth: () => 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => '#e5e7eb',
+              vLineColor: () => '#e5e7eb'
+            },
+            margin: [0, 0, 0, 20]
+          },
+
+          // Footer
+          {
+            text: 'Thank you for booking with Xplorex Travel!',
+            style: 'footer',
+            alignment: 'center',
+            margin: [0, 30, 0, 0]
+          },
+          {
+            text: 'For inquiries, contact us at support@xplorex.com',
+            style: 'footer',
+            alignment: 'center'
+          }
+        ],
+        styles: {
+          header: { fontSize: 24, bold: true, margin: [0, 0, 0, 5] },
+          subheader: { fontSize: 14, color: '#6b7280' },
+          receiptNumber: { fontSize: 12, bold: true },
+          date: { fontSize: 10, color: '#6b7280' },
+          sectionHeader: { fontSize: 14, bold: true, color: '#2563eb', margin: [0, 10, 0, 10] },
+          footer: { fontSize: 10, color: '#6b7280' }
+        },
+        defaultStyle: {
+          fontSize: 11
+        }
+      }
+
+      pdfMake.createPdf(docDefinition).download(`Receipt-${receiptNumber}.pdf`)
+    } catch (error) {
+      console.error('Error generating receipt:', error)
+      alert('Failed to generate receipt. Please try again.')
+    }
+  }
+
+  // Download Invoice PDF
+  const downloadInvoice = async () => {
+    try {
+      const pdfMakeModule = await import('pdfmake/build/pdfmake')
+      const pdfFontsModule = await import('pdfmake/build/vfs_fonts')
+      const pdfMake = pdfMakeModule.default
+      
+      // Properly assign vfs fonts
+      if (pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
+        pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs
+      }
+
+      const invoiceNumber = `INV-${booking.booking_number}`
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+
+      const docDefinition = {
+        content: [
+          // Header
+          {
+            columns: [
+              {
+                width: '*',
+                stack: [
+                  { text: 'Xplorex Travel', style: 'header', color: '#16a34a' },
+                  { text: 'Invoice', style: 'subheader' }
+                ]
+              },
+              {
+                width: 'auto',
+                stack: [
+                  { text: invoiceNumber, style: 'invoiceNumber' },
+                  { text: `Date: ${currentDate}`, style: 'date' }
+                ]
+              }
+            ],
+            margin: [0, 0, 0, 20]
+          },
+          
+          // Bill To
+          { text: 'Bill To:', style: 'sectionHeader' },
+          { text: user?.email || 'N/A', margin: [0, 0, 0, 5] },
+          { text: `Booking ID: ${booking.booking_number}`, margin: [0, 0, 0, 20] },
+
+          // Trip Details
+          { text: 'Trip Details', style: 'sectionHeader' },
+          {
+            style: 'table',
+            table: {
+              widths: ['*', 'auto'],
+              body: [
+                [{ text: 'Package', bold: true }, packageData.title],
+                [{ text: 'Destination', bold: true }, `${packageData.location}, ${packageData.country || ''}`],
+                [{ text: 'Check-in Date', bold: true }, booking.check_in_date],
+                [{ text: 'Check-out Date', bold: true }, booking.check_out_date],
+                [{ text: 'Status', bold: true }, booking.status.charAt(0).toUpperCase() + booking.status.slice(1)]
+              ]
+            },
+            layout: {
+              hLineWidth: () => 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => '#e5e7eb',
+              vLineColor: () => '#e5e7eb'
+            },
+            margin: [0, 0, 0, 20]
+          },
+
+          // Amount Details
+          { text: 'Amount Details', style: 'sectionHeader' },
+          {
+            style: 'table',
+            table: {
+              widths: ['*', 100],
+              body: [
+                [{ text: 'Package Total', bold: true }, { text: `₱${booking.total_amount.toLocaleString()}`, alignment: 'right' }],
+                [{ text: 'Amount Paid', style: 'paid' }, { text: `₱${booking.amount_paid.toLocaleString()}`, alignment: 'right', color: '#16a34a', bold: true }],
+                [{ text: 'Balance Due', style: 'balance' }, { text: `₱${booking.remaining_balance.toLocaleString()}`, alignment: 'right', color: '#dc2626', bold: true, fontSize: 12 }]
+              ]
+            },
+            layout: {
+              hLineWidth: () => 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => '#e5e7eb',
+              vLineColor: () => '#e5e7eb',
+              fillColor: (rowIndex) => rowIndex === 2 ? '#f3f4f6' : null
+            },
+            margin: [0, 0, 0, 20]
+          },
+
+          // Payment Instructions
+          {
+            text: booking.remaining_balance > 0 ? 
+              'Please complete your payment to confirm your booking.' : 
+              'Payment Complete - Thank you!',
+            style: 'paymentNote',
+            color: booking.remaining_balance > 0 ? '#dc2626' : '#16a34a',
+            margin: [0, 10, 0, 20]
+          },
+
+          // Footer
+          {
+            text: 'Terms & Conditions',
+            style: 'termsHeader',
+            margin: [0, 20, 0, 10]
+          },
+          {
+            text: [
+              '• Full payment must be received before travel dates.\n',
+              '• Cancellation policy applies as per booking terms.\n',
+              '• Contact support@xplorex.com for any inquiries.'
+            ],
+            style: 'terms'
+          },
+          {
+            text: 'Thank you for choosing Xplorex Travel!',
+            style: 'footer',
+            alignment: 'center',
+            margin: [0, 30, 0, 0]
+          }
+        ],
+        styles: {
+          header: { fontSize: 24, bold: true, margin: [0, 0, 0, 5] },
+          subheader: { fontSize: 14, color: '#6b7280' },
+          invoiceNumber: { fontSize: 12, bold: true },
+          date: { fontSize: 10, color: '#6b7280' },
+          sectionHeader: { fontSize: 14, bold: true, color: '#16a34a', margin: [0, 10, 0, 10] },
+          paymentNote: { fontSize: 12, bold: true, alignment: 'center' },
+          termsHeader: { fontSize: 12, bold: true, color: '#374151' },
+          terms: { fontSize: 9, color: '#6b7280' },
+          footer: { fontSize: 10, color: '#6b7280' }
+        },
+        defaultStyle: {
+          fontSize: 11
+        }
+      }
+
+      pdfMake.createPdf(docDefinition).download(`Invoice-${invoiceNumber}.pdf`)
+    } catch (error) {
+      console.error('Error generating invoice:', error)
+      alert('Failed to generate invoice. Please try again.')
+    }
   }
 
   if (loading) {
@@ -215,16 +589,9 @@ export default function TripDetailsPage({ params }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-semibold mb-2">{packageData.title}</h2>
-                  <div className="flex items-center gap-4 text-gray-600">
-                    <span>{booking.total_guests}</span>
-                    <span>•</span>
-                    <span>{packageData.duration}</span>
-                    <span>•</span>
-                    <div className="flex items-center gap-1">
-                      {packageData.rating && [...Array(Math.floor(packageData.rating))].map((_, i) => (
-                        <Star key={i} size={16} className="fill-yellow-400 text-yellow-400" />
-                      ))}
-                    </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <MapPin size={16} />
+                    <span>{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</span>
                   </div>
                 </div>
                 <div className="w-14 h-14 bg-gray-300 rounded-full"></div>
@@ -270,7 +637,7 @@ export default function TripDetailsPage({ params }) {
                       : 'border-transparent text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  Property details
+                  Details 
                 </button>
                 <button 
                   onClick={() => handleTabChange('daily-itinerary')}
@@ -283,25 +650,14 @@ export default function TripDetailsPage({ params }) {
                   Daily Itinerary
                 </button>
                 <button 
-                  onClick={() => handleTabChange('reviews')}
+                  onClick={() => handleTabChange('documents')}
                   className={`pb-4 border-b-2 text-sm font-medium transition-colors ${
-                    activeTab === 'reviews' 
+                    activeTab === 'documents' 
                       ? 'border-black text-gray-900' 
                       : 'border-transparent text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  Reviews
-                </button>
-                <button 
-                  onClick={() => handleTabChange('messages')}
-                  className={`pb-4 border-b-2 text-sm font-medium transition-colors flex items-center gap-1 ${
-                    activeTab === 'messages' 
-                      ? 'border-black text-gray-900' 
-                      : 'border-transparent text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  Messages
-                  <span className="bg-gray-900 text-white text-xs px-2 py-1 rounded-full">2</span>
+                  Documents
                 </button>
               </div>
             </div>
@@ -323,257 +679,64 @@ export default function TripDetailsPage({ params }) {
                   )}
                 </div>
 
-                {/* What this trip includes */}
-                <div
-                  id="trip-includes"
-                  className="py-8 border-b border-gray-200"
-                >
-                  <h3 className="font-bold text-lg mb-4">What this trip includes</h3>
-                  
-                  {/* Trip Features from package data */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {packageData.features?.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-3 py-2">
-                        <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">{feature}</span>
+
+                {/* Transportation Section (NEW SCHEMA) */}
+                {packageData.details?.filter(d => d.section_type === 'transportation').map((section, idx) => (
+                  <div key={idx} className="py-8 border-b border-gray-200">
+                    <h2 className="text-xl font-bold mb-4">{section.title || 'Transportation'}</h2>
+                    
+                    {section.local && (
+                      <div className="mb-4">
+                        <h3 className="font-semibold text-gray-900 mb-2">Local Transportation:</h3>
+                        <p className="text-gray-700">{section.local}</p>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Additional Trip Details */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h4 className="font-semibold text-gray-900 mb-4">Trip Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <Calendar size={24} className="text-blue-600" />
+                    )}
+                    
+                    {section.amenities && section.amenities.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-3">Amenities & Features:</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {section.amenities.map((amenity, amenityIdx) => (
+                            <div key={amenityIdx} className="flex items-center gap-2">
+                              <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
+                              <span className="text-gray-700">{amenity}</span>
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-sm text-gray-500">Duration</div>
-                        <div className="font-semibold text-gray-900">{packageData.duration}</div>
                       </div>
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <Users size={24} className="text-purple-600" />
-                        </div>
-                        <div className="text-sm text-gray-500">Group Size</div>
-                        <div className="font-semibold text-gray-900">{booking.total_guests}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <Star size={24} className="text-yellow-600" />
-                        </div>
-                        <div className="text-sm text-gray-500">Rating</div>
-                        <div className="font-semibold text-gray-900">{packageData.rating || '5'}/5 Stars</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Hotel Accommodation */}
-                <div className="py-8 border-b border-gray-200">
-                  <h2 className="text-xl font-bold mb-4">Hotel Accommodation</h2>
-                  <p className="text-gray-700 mb-4">
-                    {packageData.accommodation_nights || '6'} nights stay at {packageData.accommodation_name || packageData.title} {packageData.accommodation_type ? `(${packageData.accommodation_type})` : ''}
-                  </p>
-                  <div className="mb-3">
-                    <h3 className="font-semibold text-gray-900 mb-3">Amenities:</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {packageData.accommodation_amenities && packageData.accommodation_amenities.length > 0 ? (
-                        packageData.accommodation_amenities.map((amenity, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">{amenity}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Free Wi-Fi</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Private balcony with caldera view</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Daily breakfast</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Infinity pool access</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Concierge service</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Airport transfers</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Transportation */}
-                <div className="py-8 border-b border-gray-200">
-                  <h2 className="text-xl font-bold mb-4">Transportation</h2>
-                  <p className="text-gray-700 mb-4">
-                    {packageData.transportation_flights || `Round-trip flights from major cities to ${packageData.location}`}
-                  </p>
-                  <div className="mb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                      {packageData.transportation_amenities && packageData.transportation_amenities.length > 0 ? (
-                        packageData.transportation_amenities.map((amenity, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">{amenity}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Premium economy seating</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">In-flight meals</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Airport lounge access</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                            <span className="text-gray-700">Travel insurance</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">Local Transportation:</h3>
-                    <p className="text-gray-700">
-                      {packageData.local_transportation || 'Private transfers and local transportation for all tour activities'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Tour Activities */}
-                <div className="py-8 border-b border-gray-200">
-                  <h2 className="text-xl font-bold mb-4">Tour Activities</h2>
-                  
-                  <div className="mb-4">
-                    <h3 className="font-semibold text-gray-900 mb-3">Included Tours & Experiences:</h3>
-                    <div className="space-y-2 mb-4">
-                      {packageData.tour_activities && packageData.tour_activities.length > 0 ? (
-                        packageData.tour_activities.map((activity, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">{activity}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">Oia Village sunset tour</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">Wine tasting at traditional wineries</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">Caldera boat cruise</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">Red Beach and Kamari Beach visits</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <CheckCircle size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">Fira town exploration</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-3">Tour Amenities:</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {packageData.tour_amenities && packageData.tour_amenities.length > 0 ? (
-                        packageData.tour_amenities.map((amenity, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">{amenity}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">Professional tour guide</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">All entrance fees included</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">Photography sessions</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">Traditional Greek lunch</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={18} className="text-orange-500 flex-shrink-0" />
-                            <span className="text-gray-700">Bottled water and snacks</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Other Inclusions */}
-                <div className="py-8 border-b border-gray-200">
-                  <h2 className="text-xl font-bold mb-4">Other Inclusions</h2>
-                  <div className="space-y-2">
-                    {packageData.other_inclusions && packageData.other_inclusions.length > 0 ? (
-                      packageData.other_inclusions.map((inclusion, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <CheckCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">{inclusion}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        <div className="flex items-start gap-2">
-                          <CheckCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Comprehensive travel insurance for {packageData.duration || '7 days'}</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <CheckCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Free welcome dinner with live music</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <CheckCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Souvenir shopping voucher worth $100</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <CheckCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">24/7 customer support</span>
-                        </div>
-                      </>
                     )}
                   </div>
-                </div>
+                ))}
+
+                {/* Inclusions Section (NEW SCHEMA) */}
+                {packageData.details?.filter(d => d.section_type === 'inclusions').map((section, idx) => (
+                  <div key={idx} className="py-8 border-b border-gray-200">
+                    <h2 className="text-xl font-bold mb-6">What this trip includes</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                      {section.items?.map((item, itemIdx) => (
+                        <div key={itemIdx} className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Exclusions Section (NEW SCHEMA) */}
+                {packageData.details?.filter(d => d.section_type === 'exclusions').map((section, idx) => (
+                  <div key={idx} className="py-8 border-b border-gray-200">
+                    <h2 className="text-xl font-bold mb-6">What this trip excludes</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                      {section.items?.map((item, itemIdx) => (
+                        <div key={itemIdx} className="flex items-start gap-3">
+                          <span className="text-red-500 flex-shrink-0 mt-0.5 font-bold">✕</span>
+                          <span className="text-gray-700">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </>
             )}
 
@@ -588,10 +751,10 @@ export default function TripDetailsPage({ params }) {
                     {packageData.itinerary.map((day, index) => (
                       <div key={index} className="flex gap-4">
                         <div className="flex-shrink-0 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-                          {index + 1}
+                          {day.day_number || index + 1}
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-2">{day.day || `Day ${index + 1}`}: {day.title}</h4>
+                          <h4 className="font-semibold text-gray-900 mb-2">Day {day.day_number || index + 1}: {day.title}</h4>
                           <p className="text-gray-600 leading-relaxed">{day.description}</p>
                         </div>
                       </div>
@@ -603,7 +766,7 @@ export default function TripDetailsPage({ params }) {
               </div>
             )}
 
-            {activeTab === 'daily-itinerary' && booking.type === 'past' && (
+            {activeTab === 'daily-itinerary' && booking.type === 'past' && booking.highlights && Array.isArray(booking.highlights) && (
               <div 
                 id="trip-highlights"
                 className="py-8 border-b border-gray-200"
@@ -620,79 +783,202 @@ export default function TripDetailsPage({ params }) {
               </div>
             )}
 
-            {activeTab === 'reviews' && (
-              <div 
-                id="reviews"
-                className="py-8 border-b border-gray-200"
-              >
-                <h2 className="text-2xl font-bold mb-6">Reviews</h2>
-                {booking.type === 'past' && booking.rating ? (
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="flex items-center gap-1">
-                        {[...Array(Math.floor(booking.rating))].map((_, i) => (
-                          <Star key={i} size={20} className="fill-yellow-400 text-yellow-400" />
-                        ))}
-                        {booking.rating % 1 !== 0 && (
-                          <Star size={20} className="fill-yellow-200 text-yellow-400" />
-                        )}
-                      </div>
-                      <span className="font-semibold text-lg">{booking.rating}/5</span>
-                    </div>
-                    <p className="text-gray-700 leading-relaxed">{booking.review}</p>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-gray-400 mb-4">
-                      <Star size={48} className="mx-auto" />
-                    </div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">No reviews yet</h4>
-                    <p className="text-gray-600">
-                      {booking.type === 'upcoming' 
-                        ? 'You can leave a review after your trip is completed.' 
-                        : 'Be the first to leave a review for this trip!'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'messages' && (
+            {activeTab === 'documents' && (
               <>
-                <div 
-                  id="messages"
-                  className="py-8 border-b border-gray-200"
-                >
-                  <h2 className="text-2xl font-bold mb-6">Messages</h2>
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                          H
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-gray-900">Host</span>
-                            <span className="text-xs text-gray-500">2 hours ago</span>
-                          </div>
-                          <p className="text-gray-700">Welcome! We're excited to have you stay with us. Please let us know if you have any questions before your arrival.</p>
-                        </div>
+                {/* Payment Receipt Section */}
+                <div className="py-8 border-b border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold">Payment Receipt</h2>
+                    <button
+                      onClick={() => downloadReceipt()}
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Download size={18} />
+                      <span className="font-medium">Download PDF</span>
+                    </button>
+                  </div>
+
+                  {/* Receipt Header */}
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">Xplorex Travel</h3>
+                      <p className="text-gray-600">Receipt</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">RCP-{booking.booking_number}</p>
+                      <p className="text-sm text-gray-600">
+                        {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer Information */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
+                    <div className="space-y-2">
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Name:</span>
+                        <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Booking ID:</span>
+                        <span className="text-gray-900">{booking.booking_number}</span>
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                          S
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-gray-900">Support Team</span>
-                            <span className="text-xs text-gray-500">1 day ago</span>
-                          </div>
-                          <p className="text-gray-700">Your booking has been confirmed! Check your email for detailed information about your trip.</p>
-                        </div>
+                  </div>
+
+                  {/* Booking Details */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3">Booking Details</h3>
+                    <div className="space-y-2">
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Package:</span>
+                        <span className="text-gray-900">{packageData.title}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Location:</span>
+                        <span className="text-gray-900">{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Check-in:</span>
+                        <span className="text-gray-900">{booking.check_in_date}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 text-gray-600">Check-out:</span>
+                        <span className="text-gray-900">{booking.check_out_date}</span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Payment Details */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">Payment Details</h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <tbody>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Total Amount</td>
+                            <td className="px-4 py-3 text-right text-gray-900">₱{booking.total_amount.toLocaleString()}</td>
+                          </tr>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Amount Paid</td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-900">₱{booking.amount_paid.toLocaleString()}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 font-semibold text-gray-900">Remaining Balance</td>
+                            <td className="px-4 py-3 text-right font-bold text-gray-900">₱{booking.remaining_balance.toLocaleString()}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Travel Invoice Section */}
+                <div className="py-8 border-b border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold">Travel Invoice</h2>
+                    <button
+                      onClick={() => downloadInvoice()}
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Download size={18} />
+                      <span className="font-medium">Download PDF</span>
+                    </button>
+                  </div>
+
+                  {/* Invoice Header */}
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">Xplorex Travel</h3>
+                      <p className="text-gray-600">Invoice</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">INV-{booking.booking_number}</p>
+                      <p className="text-sm text-gray-600">
+                        Date: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bill To */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-2">Bill To:</h3>
+                    <p className="text-gray-900">{user?.email || 'N/A'}</p>
+                    <p className="text-sm text-gray-600">Booking ID: {booking.booking_number}</p>
+                  </div>
+
+                  {/* Trip Details */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3">Trip Details</h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <tbody>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600 w-40">Package</td>
+                            <td className="px-4 py-3 text-gray-900">{packageData.title}</td>
+                          </tr>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Destination</td>
+                            <td className="px-4 py-3 text-gray-900">{packageData.location}{packageData.country ? `, ${packageData.country}` : ''}</td>
+                          </tr>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Check-in Date</td>
+                            <td className="px-4 py-3 text-gray-900">{booking.check_in_date}</td>
+                          </tr>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Check-out Date</td>
+                            <td className="px-4 py-3 text-gray-900">{booking.check_out_date}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 text-gray-600">Status</td>
+                            <td className="px-4 py-3 text-gray-900">{booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Amount Details */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3">Amount Details</h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <tbody>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Package Total</td>
+                            <td className="px-4 py-3 text-right text-gray-900">₱{booking.total_amount.toLocaleString()}</td>
+                          </tr>
+                          <tr className="border-b border-gray-200">
+                            <td className="px-4 py-3 text-gray-600">Amount Paid</td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-900">₱{booking.amount_paid.toLocaleString()}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 font-semibold text-gray-900">Balance Due</td>
+                            <td className="px-4 py-3 text-right font-bold text-gray-900">₱{booking.remaining_balance.toLocaleString()}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Payment Note */}
+                  {booking.remaining_balance > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                      <p className="text-center font-medium text-gray-900">
+                        Please complete your payment to confirm your booking.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Terms & Conditions */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">Terms & Conditions</h3>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Full payment must be received before travel dates.</li>
+                      <li>• Cancellation policy applies as per booking terms.</li>
+                      <li>• Contact support@xplorex.com for any inquiries.</li>
+                    </ul>
                   </div>
                 </div>
               </>
@@ -710,9 +996,9 @@ export default function TripDetailsPage({ params }) {
               </div> */}
               
                             
-              {/* Date and Guest Selection */}
+              {/* Date Selection */}
               <div className="border border-gray-200 rounded-lg mb-4">
-                <div className="grid grid-cols-2 border-b border-gray-200">
+                <div className="grid grid-cols-2">
                   <div className="p-3 border-r border-gray-200">
                     <div className="text-[10px] font-bold text-gray-900 mb-1 uppercase tracking-wide">Check-in</div>
                     <div className="text-sm text-gray-900">{booking.check_in_date}</div>
@@ -722,31 +1008,70 @@ export default function TripDetailsPage({ params }) {
                     <div className="text-sm text-gray-900">{booking.check_out_date}</div>
                   </div>
                 </div>
-                <div className="p-3">
-                  <div className="text-[10px] font-bold text-gray-900 mb-1 uppercase tracking-wide">Guests</div>
-                  <div className="text-sm text-gray-900">{booking.total_guests} Adults</div>
-                </div>
               </div>
 
               {/* Total Section */}
               <div className="mb-6">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-gray-900 font-bold text-base">Total Price Due</span>
-                  <span className="text-gray-900 font-bold text-2xl">₱{booking.total_amount.toLocaleString()}</span>
-                </div>
-                <div className="text-gray-500 text-xs">
-                  Deductible by {booking.payment_due_date ? new Date(booking.payment_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Our 14th'}
-                </div>
+                {booking.remaining_balance > 0 ? (
+                  <>
+                    {/* Show breakdown when there's remaining balance */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Total Package</span>
+                        <span className="text-gray-900 font-semibold">₱{booking.total_amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Amount Paid</span>
+                        <span className="text-green-600 font-semibold">₱{booking.amount_paid.toLocaleString()}</span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-900 font-bold text-base">Remaining Balance</span>
+                          <span className="text-orange-600 font-bold text-2xl">₱{booking.remaining_balance.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-gray-500 text-xs mt-2">
+                      {/* {(() => {
+                        const checkInDate = new Date(booking.check_in_date)
+                        checkInDate.setHours(0, 0, 0, 0)
+                        const paymentDeadline = new Date(checkInDate)
+                        paymentDeadline.setDate(paymentDeadline.getDate() - 45)
+                        return `Deductible by ${paymentDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                      })()} */}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Show only total when fully paid */}
+                    {/* <div className="flex justify-between items-center mb-1">
+                      <span className="text-gray-900 font-bold text-base">Total Price Due</span>
+                      <span className="text-gray-900 font-bold text-2xl">₱{booking.total_amount.toLocaleString()}</span>
+                    </div>
+                    <div className="text-gray-500 text-xs">
+                      Deductible by {booking.payment_due_date ? new Date(booking.payment_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Our 14th'}
+                    </div> */}
+                  </>
+                )}
               </div>
 
               {/* Action Buttons */}
               <div className="mb-6">
                 {booking.remaining_balance > 0 ? (
-                  <Link href={`/dashboard/trip/${slug}/payment`}>
-                    <button className="w-full bg-blue-600 text-white py-3.5 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">
-                      Continue to checkout
-                    </button>
-                  </Link>
+                  <button 
+                    onClick={handlePayNow}
+                    disabled={processingPayment}
+                    className="w-full bg-blue-600 text-white py-3.5 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {processingPayment ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Processing...
+                      </>
+                    ) : (
+                      'Continue to checkout'
+                    )}
+                  </button>
                 ) : (
                   <button className="w-full bg-green-600 text-white py-3.5 px-6 rounded-lg font-semibold cursor-default">
                     Fully Paid

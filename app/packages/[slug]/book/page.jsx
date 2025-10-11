@@ -9,6 +9,7 @@ import { getPackageBySlug } from "@/lib/packages"
 import { useAuth } from "@/lib/AuthContext"
 import { getUserProfile } from "@/lib/userProfile"
 import { createBooking } from "@/lib/bookings"
+import { createCheckoutSession } from "@/lib/paymongo"
 
 export default function BookingPage({ params }) {
   const { user } = useAuth()
@@ -18,10 +19,11 @@ export default function BookingPage({ params }) {
     lastName: "",
     email: "",
     phone: "",
-    checkIn: "",
-    checkOut: "",
-    adults: 2,
-    children: 0,
+    adults: 1, // Number of adults (default 1)
+    children: 0, // Number of children (default 0)
+    selectedDealId: "", // NEW: Select a specific deal instead of free dates
+    paymentOption: "", // "full" or "partial" - no default selection
+    paymentMethod: "paymongo", // Payment method
     specialRequests: "",
   })
   const [isVisible, setIsVisible] = useState({})
@@ -96,6 +98,13 @@ export default function BookingPage({ params }) {
     return () => observer.disconnect()
   }, [])
 
+  // Auto-switch to full payment if selected deal is less than 45 days away
+  useEffect(() => {
+    if (formData.selectedDealId && !isPartialPaymentAvailable() && formData.paymentOption === 'partial') {
+      setFormData(prev => ({ ...prev, paymentOption: 'full' }))
+    }
+  }, [formData.selectedDealId])
+
   console.log('Render state - loading:', loading, 'error:', error, 'packageData:', packageData)
 
   if (loading) {
@@ -131,63 +140,64 @@ export default function BookingPage({ params }) {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    
-    // Validate check-out date is not before check-in date
-    if (name === 'checkOut' && formData.checkIn && value < formData.checkIn) {
-      alert('Check-out date cannot be earlier than check-in date')
-      return
-    }
-    
-    // Validate check-in date is not after check-out date
-    if (name === 'checkIn' && formData.checkOut && value > formData.checkOut) {
-      alert('Check-in date cannot be later than check-out date')
-      return
-    }
-    
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Parse max people from package (e.g., "2-4 People" -> 4)
-  const getMaxPeople = () => {
-    if (!packageData?.people) return 10 // Default max if not specified
-    const match = packageData.people.match(/(\d+)\s*-\s*(\d+)|\b(\d+)\b/)
-    if (match) {
-      // If range like "2-4", return the max (4)
-      return match[2] ? parseInt(match[2]) : parseInt(match[3] || match[1])
-    }
-    return 10 // Default fallback
+  // NEW SCHEMA: Get available deals (only active deals)
+  const getAvailableDeals = () => {
+    if (!packageData?.deals) return []
+    return packageData.deals.filter(deal => deal.is_active !== false)
   }
 
-  const handleNumberChange = (field, increment) => {
-    setFormData((prev) => {
-      const newValue = prev[field] + increment
-      const totalTravelers = field === 'adults' 
-        ? newValue + prev.children 
-        : prev.adults + newValue
-      
-      const maxPeople = getMaxPeople()
-      
-      // Don't allow total to exceed max people
-      if (totalTravelers > maxPeople && increment > 0) {
-        return prev
-      }
-      
-      // Adults: minimum 1, children: minimum 0
-      const minValue = field === 'adults' ? 1 : 0
-      
-      return {
-        ...prev,
-        [field]: Math.max(minValue, newValue)
-      }
-    })
+  // Get selected deal details
+  const getSelectedDeal = () => {
+    if (!formData.selectedDealId || !packageData?.deals) return null
+    return packageData.deals.find(deal => deal.id === formData.selectedDealId)
+  }
+
+  // NEW SCHEMA: Calculate price from selected deal
+  const getPackagePrice = () => {
+    const selectedDeal = getSelectedDeal()
+    if (selectedDeal) {
+      return parseFloat(selectedDeal.deal_price) || 0
+    }
+    // If no deal selected, show minimum price
+    if (!packageData?.deals || packageData.deals.length === 0) return 0
+    const prices = packageData.deals.map(deal => parseFloat(deal.deal_price) || 0)
+    return Math.min(...prices)
+  }
+
+  // Check if partial payment is available (deal must be 45+ days away)
+  const isPartialPaymentAvailable = () => {
+    const selectedDeal = getSelectedDeal()
+    if (!selectedDeal) return false
+    
+    const dealStartDate = new Date(selectedDeal.deal_start_date)
+    const currentDate = new Date()
+    const daysUntilDeal = Math.ceil((dealStartDate - currentDate) / (1000 * 60 * 60 * 24))
+    
+    return daysUntilDeal >= 45
   }
 
   const calculateTotal = () => {
-    console.log('Calculating total with pkg.price_value:', pkg.price_value)
-    const priceValue = pkg.price_value || 0
-    // Fixed package price - doesn't change with number of travelers
+    // NEW SCHEMA: Get price from deals instead of package.price_value
+    const priceValue = getPackagePrice()
+    console.log('Calculating total with deal price:', priceValue)
+    
+    // Calculate based on payment option
+    let amountToPay = priceValue
+    let remaining = 0
+    
+    if (formData.paymentOption === 'partial') {
+      // Partial payment: 50% now, rest later
+      amountToPay = priceValue * 0.50
+      remaining = priceValue - amountToPay
+    }
+    
     const result = {
       subtotal: priceValue,
+      amountToPay: amountToPay,
+      remaining: remaining,
       total: priceValue,
     }
     console.log('Total calculated:', result)
@@ -207,48 +217,100 @@ export default function BookingPage({ params }) {
       return
     }
 
-    // Validate dates
-    if (!formData.checkIn || !formData.checkOut) {
-      alert('Please select check-in and check-out dates')
+    // Validate deal selection
+    if (!formData.selectedDealId) {
+      alert('Please select a travel deal period')
       return
     }
 
-    if (formData.checkOut <= formData.checkIn) {
-      alert('Check-out date must be after check-in date')
+    // Validate payment option selection
+    if (!formData.paymentOption) {
+      alert('Please choose a payment option')
+      return
+    }
+
+    const selectedDeal = getSelectedDeal()
+    if (!selectedDeal) {
+      alert('Selected deal is no longer available')
+      return
+    }
+
+    // Check if deal has available slots
+    const availableSlots = (selectedDeal.slots_available || 0) - (selectedDeal.slots_booked || 0)
+    if (availableSlots <= 0) {
+      alert('This deal is fully booked. Please select another date.')
       return
     }
 
     setSubmitting(true)
 
     try {
-      // Prepare booking data
+      // Store booking data in session storage to be created after payment
       const bookingData = {
         userId: user.id,
         packageId: packageData.id,
+        packageTitle: packageData.title,
+        dealId: selectedDeal.id,
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        checkIn: formData.checkIn,
-        checkOut: formData.checkOut,
-        adults: formData.adults,
-        children: formData.children,
+        adults: parseInt(formData.adults) || 1,
+        children: parseInt(formData.children) || 0,
+        checkIn: selectedDeal.deal_start_date,
+        checkOut: selectedDeal.deal_end_date,
         totalAmount: totals.total,
+        amountToPay: totals.amountToPay,
+        remainingAmount: totals.remaining,
+        paymentOption: formData.paymentOption,
+        paymentMethod: formData.paymentMethod,
         specialRequests: formData.specialRequests,
       }
 
-      console.log('Submitting booking:', bookingData)
+      console.log('Creating PayMongo checkout session for booking:', bookingData)
+      
+      // Store in sessionStorage to create booking after payment
+      sessionStorage.setItem('pendingBooking', JSON.stringify(bookingData))
 
-      // Create booking
-      const result = await createBooking(bookingData)
+      // Get the current URL origin for success/cancel URLs
+      const origin = window.location.origin
+
+      // Create PayMongo checkout session
+      const paymentData = {
+        amount: totals.amountToPay,
+        description: `${packageData.title} - ${formData.paymentOption === 'full' ? 'Full Payment' : 'Partial Payment (50%)'}`,
+        lineItems: [
+          {
+            currency: 'PHP',
+            amount: totals.amountToPay,
+            description: `Travel dates: ${new Date(selectedDeal.deal_start_date).toLocaleDateString()} - ${new Date(selectedDeal.deal_end_date).toLocaleDateString()}`,
+            name: packageData.title,
+            quantity: 1,
+            images: packageData.images && packageData.images.length > 0 
+              ? packageData.images.filter(img => img.startsWith('http')).slice(0, 1)
+              : []
+          }
+        ],
+        billing: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email
+        },
+        successUrl: `${origin}/packages/${params.slug}/book/payment/success`,
+        cancelUrl: `${origin}/packages/${params.slug}/book`
+      }
+
+      const result = await createCheckoutSession(paymentData)
 
       if (result.success) {
-        alert(`Booking confirmed! Your booking number is: ${result.booking.booking_number}`)
-        // Redirect to user dashboard or booking details
-        router.push('/dashboard')
+        console.log('Checkout session created, redirecting to:', result.checkoutUrl)
+        // Store session ID for verification
+        sessionStorage.setItem('paymentSessionId', result.sessionId)
+        // Redirect to PayMongo checkout
+        window.location.href = result.checkoutUrl
       } else {
-        alert(`Booking failed: ${result.error}`)
+        throw new Error(result.error || 'Failed to create checkout session')
       }
+      
     } catch (err) {
       console.error('Booking submission error:', err)
       alert('An error occurred while creating your booking. Please try again.')
@@ -280,7 +342,7 @@ export default function BookingPage({ params }) {
             data-animate
             className="lg:col-span-2"
           >
-            <div className="bg-white rounded-2xl p-8">
+            <div className="bg-white rounded-2xl p-8 shadow-none">
               <h1 className="text-3xl font-bold mb-2">Complete Your Booking</h1>
               <p className="text-gray-600 mb-8">Fill in your details to reserve your dream vacation</p>
 
@@ -345,109 +407,226 @@ export default function BookingPage({ params }) {
                 <div>
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Calendar size={24} className="text-blue-500" />
-                    Travel Dates
+                    Select Travel Deal Period
                   </h2>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Check-in Date *</label>
-                      <input
-                        type="date"
-                        name="checkIn"
-                        value={formData.checkIn}
-                        onChange={handleInputChange}
-                        min={new Date().toISOString().split('T')[0]}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Check-out Date *</label>
-                      <input
-                        type="date"
-                        name="checkOut"
-                        value={formData.checkOut}
-                        onChange={handleInputChange}
-                        min={formData.checkIn || new Date().toISOString().split('T')[0]}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    {getAvailableDeals().length > 0 ? (
+                      getAvailableDeals().map((deal) => {
+                        const availableSlots = (deal.slots_available || 0) - (deal.slots_booked || 0)
+                        const isSelected = formData.selectedDealId === deal.id
+                        const isSoldOut = availableSlots <= 0
+                        
+                        // Calculate days until deal starts
+                        const dealStartDate = new Date(deal.deal_start_date)
+                        dealStartDate.setHours(0, 0, 0, 0) // Set to midnight
+                        const currentDate = new Date()
+                        currentDate.setHours(0, 0, 0, 0) // Set to midnight
+                        const daysUntilDeal = Math.round((dealStartDate - currentDate) / (1000 * 60 * 60 * 24))
+                        
+                        return (
+                          <label
+                            key={deal.id}
+                            className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition ${
+                              isSoldOut 
+                                ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' 
+                                : isSelected
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="selectedDeal"
+                              value={deal.id}
+                              checked={isSelected}
+                              onChange={() => !isSoldOut && setFormData(prev => ({ ...prev, selectedDealId: deal.id }))}
+                              disabled={isSoldOut}
+                              className="sr-only"
+                            />
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                              }`}>
+                                {isSelected && <Check size={14} className="text-white" />}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {new Date(deal.deal_start_date).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    year: 'numeric' 
+                                  })}
+                                  {' → '}
+                                  {new Date(deal.deal_end_date).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    year: 'numeric' 
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-500 mt-0.5">
+                                  {isSoldOut ? (
+                                    <span className="text-red-600">Sold Out</span>
+                                  ) : (
+                                    <>
+                                      <span>{availableSlots} {availableSlots === 1 ? 'slot' : 'slots'} left</span>
+                                      <span className="text-gray-400">•</span>
+                                      <span className={daysUntilDeal >= 45 ? 'text-green-600' : 'text-orange-600'}>
+                                        {daysUntilDeal > 0 
+                                          ? `${daysUntilDeal} ${daysUntilDeal === 1 ? 'day' : 'days'} away`
+                                          : daysUntilDeal === 0 
+                                            ? 'Starts today'
+                                            : 'Started'
+                                        }
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-gray-900">
+                                ₱{parseFloat(deal.deal_price).toLocaleString()}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No available deals at the moment. Please check back later.
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Users size={24} className="text-blue-500" />
-                    Number of Travelers
-                  </h2>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Adults (18+)</label>
-                      <div className="flex items-center gap-4">
-                        <button
-                          type="button"
-                          onClick={() => handleNumberChange("adults", -1)}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="text-2xl font-bold w-12 text-center">{formData.adults}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleNumberChange("adults", 1)}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold"
-                        >
-                          +
-                        </button>
+                  <h2 className="text-xl font-bold mb-4">Choose Payment Option</h2>
+                  {!formData.selectedDealId && (
+                    <p className="text-sm text-gray-500 mb-4">Please select a travel deal first</p>
+                  )}
+                  <div className="space-y-2">
+                    {/* Full Payment Option */}
+                    <label
+                      className={`flex items-center justify-between p-4 border rounded-lg transition ${
+                        !formData.selectedDealId
+                          ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                          : formData.paymentOption === 'full'
+                            ? 'border-blue-500 bg-blue-50 cursor-pointer'
+                            : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentOption"
+                        value="full"
+                        checked={formData.paymentOption === 'full'}
+                        onChange={(e) => setFormData(prev => ({ ...prev, paymentOption: e.target.value }))}
+                        disabled={!formData.selectedDealId}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          formData.paymentOption === 'full' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                        }`}>
+                          {formData.paymentOption === 'full' && <Check size={14} className="text-white" />}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">Full Payment</div>
+                          <div className="text-sm text-gray-600">Pay the complete amount now</div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Children (0-17)</label>
-                      <div className="flex items-center gap-4">
-                        <button
-                          type="button"
-                          onClick={() => handleNumberChange("children", -1)}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="text-2xl font-bold w-12 text-center">{formData.children}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleNumberChange("children", 1)}
-                          className="w-10 h-10 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold"
-                        >
-                          +
-                        </button>
+                      {formData.selectedDealId && (
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gray-900">
+                            ₱{totals.total.toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                    </label>
+
+                    {/* Partial Payment Option */}
+                    <label
+                      className={`flex items-center justify-between p-4 border rounded-lg transition ${
+                        !formData.selectedDealId || !isPartialPaymentAvailable()
+                          ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                          : formData.paymentOption === 'partial'
+                            ? 'border-blue-500 bg-blue-50 cursor-pointer'
+                            : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentOption"
+                        value="partial"
+                        checked={formData.paymentOption === 'partial'}
+                        onChange={(e) => setFormData(prev => ({ ...prev, paymentOption: e.target.value }))}
+                        disabled={!formData.selectedDealId || !isPartialPaymentAvailable()}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          formData.paymentOption === 'partial' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                        }`}>
+                          {formData.paymentOption === 'partial' && <Check size={14} className="text-white" />}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">Partial Payment</div>
+                          <div className="text-sm text-gray-600">
+                            {!formData.selectedDealId
+                              ? 'Select a deal to see payment options'
+                              : isPartialPaymentAvailable() 
+                                ? 'Pay 50% now, rest before travel'
+                                : 'Only available for bookings 45+ days in advance'
+                            }
+                          </div>
+                        </div>
                       </div>
+                      {formData.selectedDealId && (
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gray-900">
+                            ₱{(totals.total * 0.50).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            Remaining: ₱{(totals.total * 0.50).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                    </label>
                   </div>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
-                  <p className="text-sm text-blue-700">
-                    <span className="font-semibold">Maximum capacity:</span> {getMaxPeople()} people total
-                    <br />
-                    <span className="text-xs">This is a bundle package - price stays the same for all travelers</span>
-                  </p>
-                  {(formData.adults + formData.children) >= getMaxPeople() && (
-                    <p className="text-xs text-orange-600 mt-1">
-                      ⚠️ You've reached the maximum capacity for this package
-                    </p>
-                  )}
+
+                <div>
+                  <h2 className="text-xl font-bold mb-4">Payment Method</h2>
+                  <div className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="paymongo"
+                      checked={formData.paymentMethod === 'paymongo'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                      className="sr-only"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                          <path d="M2 10h20" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <span className="font-semibold text-gray-900">Secure Payment via PayMongo</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        You'll be redirected to PayMongo's secure checkout
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Supports all major credit cards, debit cards, and digital wallets</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>                <div>
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <MessageSquare size={24} className="text-blue-500" />
-                    Special Requests
-                  </h2>
-                  <textarea
-                    name="specialRequests"
-                    value={formData.specialRequests}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none"
-                    placeholder="Any dietary restrictions, accessibility needs, or special occasions we should know about?"
-                  />
-                </div>
+
 
                 <button
                   type="submit"
@@ -476,7 +655,7 @@ export default function BookingPage({ params }) {
             data-animate
             className="lg:col-span-1"
           >
-            <div className="bg-white rounded-2xl p-6 sticky top-24">
+            <div className="bg-white rounded-2xl p-6 sticky top-24 shadow-none">
               <h2 className="text-xl font-bold mb-6">Booking Summary</h2>
 
               <div className="rounded-xl overflow-hidden mb-6">
@@ -493,43 +672,74 @@ export default function BookingPage({ params }) {
                   <MapPin size={16} />
                   <span>{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-600 text-sm">
-                  <Calendar size={16} />
-                  <span>{pkg.duration}</span>
-                </div>
-                {pkg.people && (
-                  <div className="flex items-center gap-2 text-gray-600 text-sm">
-                    <Users size={16} />
-                    <span>{pkg.people}</span>
+                {/* Show selected deal dates */}
+                {formData.selectedDealId && getSelectedDeal() && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-blue-900 text-sm font-medium mb-1">
+                      <Calendar size={16} />
+                      <span>Selected Travel Period</span>
+                    </div>
+                    <div className="text-sm text-blue-800 pl-6">
+                      {new Date(getSelectedDeal().deal_start_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                      {' - '}
+                      {new Date(getSelectedDeal().deal_end_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-gray-200 pt-4 mb-6">
-                <h4 className="font-semibold text-sm text-gray-700 mb-3">Included Features</h4>
-                <div className="space-y-2">
-                  {pkg.features && pkg.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                      <Check size={16} className="text-green-500" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
+              {/* NEW SCHEMA: Show inclusions instead of features */}
+              {pkg.details && pkg.details.some(d => d.section_type === 'inclusions') && (
+                <div className="border-t border-gray-200 pt-4 mb-6">
+                  <h4 className="font-semibold text-sm text-gray-700 mb-3">Included Features</h4>
+                  <div className="space-y-2">
+                    {pkg.details
+                      .filter(d => d.section_type === 'inclusions')
+                      .map(section => section.items || [])
+                      .flat()
+                      .slice(0, 5) // Show first 5 inclusions
+                      .map((item, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                          <Check size={16} className="text-green-500" />
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="border-t border-gray-200 pt-4 space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Package Price (for {formData.adults + formData.children} {formData.adults + formData.children === 1 ? 'person' : 'people'})</span>
-                  <span className="font-semibold">₱{pkg.price_value?.toLocaleString()}</span>
+                  <span className="text-gray-600">Package Price</span>
+                  <span className="font-semibold">₱{totals.subtotal.toLocaleString()}</span>
                 </div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-2 my-2">
-                  <p className="text-xs text-green-700">
-                    ✓ Fixed bundle price - includes all travelers
-                  </p>
-                </div>
-                <div className="border-t border-gray-200 pt-3 flex justify-between">
-                  <span className="font-bold text-lg">Total</span>
-                  <span className="font-bold text-2xl text-blue-500">₱{totals.total.toLocaleString()}</span>
+                
+                {formData.paymentOption === 'partial' && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Pay Now (50%)</span>
+                      <span className="font-semibold">₱{totals.amountToPay.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Remaining</span>
+                      <span className="font-semibold">₱{totals.remaining.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+                
+                <div className="pt-3 border-t border-gray-200 flex justify-between">
+                  <span className="font-bold text-lg">
+                    {formData.paymentOption === 'partial' ? 'Pay Now' : 'Total'}
+                  </span>
+                  <span className="font-bold text-2xl text-blue-500">₱{totals.amountToPay.toLocaleString()}</span>
                 </div>
               </div>
 

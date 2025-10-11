@@ -1,13 +1,16 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { LayoutDashboard, Package, Calendar, Users, FileText, LogOut, Settings, Home } from "lucide-react"
+import { usePathname, useSearchParams } from "next/navigation"
+import { LayoutDashboard, Package, Calendar, Users, FileText, LogOut, Settings, ChevronDown, DollarSign, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/AuthContext"
 
 export default function AdminSidebar({ isOpen, onClose }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { user, profile } = useAuth()
+  const [reportsOpen, setReportsOpen] = useState(pathname?.startsWith('/admin/reports'))
 
   // Get user display name and initials
   const displayName = profile?.first_name && profile?.last_name 
@@ -29,7 +32,15 @@ export default function AdminSidebar({ isOpen, onClose }) {
     { name: "Packages", href: "/admin/packages", icon: Package },
     { name: "Bookings", href: "/admin/bookings", icon: Calendar },
     { name: "Customers", href: "/admin/customers", icon: Users },
-    { name: "Reports", href: "/admin/reports", icon: FileText },
+  ]
+
+  const reportLinks = [
+    { name: "Sales", href: "/admin/reports?type=sales", icon: DollarSign },
+    { name: "Bookings", href: "/admin/reports?type=bookings", icon: Calendar },
+    { name: "Customers", href: "/admin/reports?type=customers", icon: Users },
+    { name: "Packages", href: "/admin/reports?type=packages", icon: Package },
+    { name: "Revenue Analytics", href: "/admin/reports?type=revenue", icon: TrendingUp },
+    { name: "Custom", href: "/admin/reports?type=custom", icon: FileText },
   ]
 
   return (
@@ -39,8 +50,8 @@ export default function AdminSidebar({ isOpen, onClose }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-gray-200">
-            <Link href="/admin/dashboard" className="text-2xl font-bold">
-              Xplore<span className="text-blue-500 italic">x</span>
+            <Link href="/admin/dashboard" className="flex items-center">
+              <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-8 w-auto" />
             </Link>
           </div>
 
@@ -64,6 +75,53 @@ export default function AdminSidebar({ isOpen, onClose }) {
                 </Link>
               )
             })}
+
+            {/* Reports Dropdown */}
+            <div>
+              <button
+                onClick={() => setReportsOpen(!reportsOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition ${
+                  pathname?.startsWith('/admin/reports')
+                    ? "bg-blue-50 text-blue-600 font-semibold"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText size={20} />
+                  <span>Reports</span>
+                </div>
+                <ChevronDown 
+                  size={18} 
+                  className={`transition-transform ${reportsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Dropdown Menu */}
+              {reportsOpen && (
+                <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-4">
+                  {reportLinks.map((report) => {
+                    const Icon = report.icon
+                    const reportType = report.href.split('type=')[1]
+                    const currentType = searchParams?.get('type')
+                    const isActive = pathname === '/admin/reports' && currentType === reportType
+                    return (
+                      <Link
+                        key={report.href}
+                        href={report.href}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 font-medium"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        <Icon size={16} />
+                        <span>{report.name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* User Profile */}
@@ -87,19 +145,11 @@ export default function AdminSidebar({ isOpen, onClose }) {
             </div>
 
             <Link
-              href="/"
-              className="flex items-center gap-3 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg transition mb-2"
-            >
-              <Home size={18} />
-              <span className="text-sm">User Home</span>
-            </Link>
-
-            <Link
               href="/admin/settings"
               className="flex items-center gap-3 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition mb-2"
             >
               <Settings size={18} />
-              <span className="text-sm">Settings</span>
+              <span className="text-sm">Profile</span>
             </Link>
 
             <Link
@@ -122,8 +172,8 @@ export default function AdminSidebar({ isOpen, onClose }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-gray-200">
-            <Link href="/admin/dashboard" className="text-2xl font-bold" onClick={onClose}>
-              Xplore<span className="text-blue-500 italic">x</span>
+            <Link href="/admin/dashboard" className="flex items-center" onClick={onClose}>
+              <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-10 w-auto" />
             </Link>
           </div>
 
@@ -148,6 +198,54 @@ export default function AdminSidebar({ isOpen, onClose }) {
                 </Link>
               )
             })}
+
+            {/* Reports Dropdown - Mobile */}
+            <div>
+              <button
+                onClick={() => setReportsOpen(!reportsOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition ${
+                  pathname?.startsWith('/admin/reports')
+                    ? "bg-blue-50 text-blue-600 font-semibold"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText size={20} />
+                  <span>Reports</span>
+                </div>
+                <ChevronDown 
+                  size={18} 
+                  className={`transition-transform ${reportsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Dropdown Menu - Mobile */}
+              {reportsOpen && (
+                <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-4">
+                  {reportLinks.map((report) => {
+                    const Icon = report.icon
+                    const reportType = report.href.split('type=')[1]
+                    const currentType = searchParams?.get('type')
+                    const isActive = pathname === '/admin/reports' && currentType === reportType
+                    return (
+                      <Link
+                        key={report.href}
+                        href={report.href}
+                        onClick={onClose}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 font-medium"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        <Icon size={16} />
+                        <span>{report.name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* User Profile */}
@@ -171,21 +269,12 @@ export default function AdminSidebar({ isOpen, onClose }) {
             </div>
 
             <Link
-              href="/"
-              onClick={onClose}
-              className="flex items-center gap-3 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg transition mb-2"
-            >
-              <Home size={18} />
-              <span className="text-sm">User Home</span>
-            </Link>
-
-            <Link
               href="/admin/settings"
               onClick={onClose}
               className="flex items-center gap-3 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition mb-2"
             >
               <Settings size={18} />
-              <span className="text-sm">Settings</span>
+              <span className="text-sm">Profile</span>
             </Link>
 
             <Link

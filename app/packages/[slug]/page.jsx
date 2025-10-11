@@ -111,10 +111,9 @@ export default function PackageDetailPage({ params }) {
   }
 
   const pkg = packageData
-  const accommodationDetails = getDetailsByType('accommodation')
   const transportationDetails = getDetailsByType('transportation')
-  const activitiesDetails = getDetailsByType('activities')
-  const inclusionsDetails = getDetailsByType('inclusions')
+  const inclusionsDetails = pkg.details?.filter(d => d.section_type === 'inclusions') || []
+  const exclusionsDetails = getDetailsByType('exclusions')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -206,70 +205,101 @@ export default function PackageDetailPage({ params }) {
           <div className="lg:col-span-2 space-y-8">
             {/* Title and Basic Info */}
             <div>
-              <div className="text-sm text-gray-500 mb-2">(01) Specifications</div>
-              <h1 className="text-5xl font-bold mb-4">{pkg.title}</h1>
-              <p className="text-gray-600 text-lg mb-6">{pkg.description}</p>
-
-              <div className="flex items-center gap-6 text-gray-600">
+              <h1 className="text-4xl font-bold mb-3">{pkg.title}</h1>
+              
+              <div className="flex items-center gap-4 text-gray-600 mb-4">
                 <div className="flex items-center gap-2">
-                  <MapPin size={20} />
+                  <MapPin size={18} />
                   <span>{pkg.location}{pkg.country ? `, ${pkg.country}` : ''}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar size={20} />
-                  <span>{pkg.duration}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users size={20} />
-                  <span>{pkg.people || 2} People</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="fill-yellow-400 text-yellow-400" size={20} />
-                  <span className="font-semibold">{pkg.rating || 0}</span>
-                  <span className="text-sm">({pkg.reviews_count || 0} reviews)</span>
-                </div>
               </div>
+
+              {pkg.description && (
+                <p className="text-gray-600 text-base leading-relaxed mb-6">{pkg.description}</p>
+              )}
             </div>
 
-            {/* Detailed Package Information */}
-            {!accommodationDetails && !transportationDetails && !activitiesDetails && !inclusionsDetails && (
-              <div className="py-8 border-b border-gray-200">
+            {/* Deal Periods - Minimal Design */}
+            {pkg.deals && pkg.deals.length > 0 && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Available Deal Periods</h2>
+                <div className="space-y-2">
+                  {pkg.deals.map((deal, index) => (
+                    <div key={index} className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 rounded-lg transition group border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <Calendar size={16} className="text-gray-400 group-hover:text-blue-500 transition" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(deal.deal_start_date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
+                            {' - '}
+                            {new Date(deal.deal_end_date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                            <Users size={12} />
+                            <span>{deal.slots_available - (deal.slots_booked || 0)} slots available</span>
+                            {deal.slots_booked > 0 && (
+                              <span className="text-gray-400">• {deal.slots_booked} booked</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xl font-bold text-gray-900">
+                          ₱{Number(deal.deal_price).toLocaleString()}
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          deal.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {deal.is_active ? 'Available' : 'Unavailable'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Package Details Sections */}
+            {!transportationDetails && inclusionsDetails.length === 0 && !exclusionsDetails && (
+              <div className="py-8 border-t border-gray-200">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                   <p className="text-gray-700 mb-2">
                     <strong>Package details are being finalized.</strong>
                   </p>
                   <p className="text-gray-600 text-sm">
-                    Full details about accommodation, transportation, activities, and inclusions will be available soon.
+                    Full details about transportation, inclusions, and exclusions will be available soon.
                   </p>
                 </div>
               </div>
             )}
             
-            {/* Hotel Accommodation */}
-            {accommodationDetails && (
-              <div
-                id="accommodation"
-                data-animate
-                className={`py-8 border-b border-gray-200 transition-all duration-700 ${
-                  isVisible.accommodation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-                }`}
-              >
-                <h2 className="text-2xl font-bold mb-6">{accommodationDetails.title}</h2>
-                {accommodationDetails.description && (
-                  <p className="text-gray-600 mb-4">{accommodationDetails.description}</p>
-                )}
-                {accommodationDetails.nights_info && (
-                  <div className="mb-4">
-                    <h3 className="font-semibold text-lg mb-2">{accommodationDetails.nights_info}</h3>
+            {/* Transportation */}
+            {transportationDetails && (
+              <div className="py-8 border-t border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Transportation</h2>
+                
+                {transportationDetails.local && (
+                  <div className="mb-6 bg-blue-50 rounded-lg p-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Local Transportation:</h4>
+                    <p className="text-gray-700">{transportationDetails.local}</p>
                   </div>
                 )}
-                {accommodationDetails.amenities && accommodationDetails.amenities.length > 0 && (
+                
+                {transportationDetails.amenities && transportationDetails.amenities.length > 0 && (
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Amenities:</h4>
-                    <div className="grid md:grid-cols-2 gap-2">
-                      {accommodationDetails.amenities.map((amenity, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Check className="text-green-500 flex-shrink-0" size={16} />
+                    <h4 className="font-semibold text-gray-900 mb-4">Amenities & Features:</h4>
+                    <div className="grid md:grid-cols-2 gap-x-8 gap-y-3">
+                      {transportationDetails.amenities.map((amenity, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <Check className="text-green-500 flex-shrink-0 mt-0.5" size={18} />
                           <span className="text-gray-700">{amenity}</span>
                         </div>
                       ))}
@@ -279,213 +309,187 @@ export default function PackageDetailPage({ params }) {
               </div>
             )}
 
-                {/* Transportation */}
-                {transportationDetails && (
-                  <div
-                    id="transportation"
-                    data-animate
-                    className={`py-8 border-b border-gray-200 transition-all duration-700 ${
-                      isVisible.transportation ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-                    }`}
-                  >
-                    <h2 className="text-2xl font-bold mb-6">{transportationDetails.title}</h2>
-                    {transportationDetails.description && (
-                      <p className="text-gray-600 mb-4">{transportationDetails.description}</p>
-                    )}
-                    <div className="space-y-4">
-                      {transportationDetails.flights_info && (
-                        <div>
-                          <h3 className="font-semibold text-lg mb-2">{transportationDetails.flights_info}</h3>
-                        </div>
+            {/* Inclusions */}
+            {inclusionsDetails.length > 0 && (
+              <div className="py-8 border-t border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Inclusions</h2>
+                <div className="space-y-6">
+                  {inclusionsDetails.map((section, idx) => (
+                    <div key={idx}>
+                      {section.title && section.title !== 'Inclusions' && inclusionsDetails.length > 1 && (
+                        <h4 className="font-semibold text-gray-900 mb-3">{section.title}</h4>
                       )}
-                      {transportationDetails.amenities && transportationDetails.amenities.length > 0 && (
-                        <div className="grid md:grid-cols-2 gap-2">
-                          {transportationDetails.amenities.map((amenity, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Check className="text-blue-500 flex-shrink-0" size={16} />
-                              <span className="text-gray-700">{amenity}</span>
+                      {section.items && section.items.length > 0 && (
+                        <div className="grid md:grid-cols-2 gap-x-8 gap-y-3">
+                          {section.items.map((item, index) => (
+                            <div key={index} className="flex items-start gap-2">
+                              <Check className="text-green-500 flex-shrink-0 mt-0.5" size={18} />
+                              <span className="text-gray-700">{item}</span>
                             </div>
                           ))}
                         </div>
                       )}
-                      {transportationDetails.local_transport && (
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Local Transportation:</h4>
-                          <p className="text-gray-700">{transportationDetails.local_transport}</p>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              </div>
+            )}
 
-                {/* Tour Activities */}
-                {activitiesDetails && (
-                  <div
-                    id="activities"
-                    data-animate
-                    className={`py-8 border-b border-gray-200 transition-all duration-700 ${
-                      isVisible.activities ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-                    }`}
-                  >
-                    <h2 className="text-2xl font-bold mb-6">{activitiesDetails.title}</h2>
-                    {activitiesDetails.description && (
-                      <p className="text-gray-600 mb-4">{activitiesDetails.description}</p>
-                    )}
-                    <div className="space-y-4">
-                      {activitiesDetails.tours && activitiesDetails.tours.length > 0 && (
-                        <div>
-                          <h3 className="font-semibold text-lg mb-3">Included Tours & Experiences:</h3>
-                          <div className="space-y-2 mb-4">
-                            {activitiesDetails.tours.map((tour, index) => (
-                              <div key={index} className="flex items-start gap-2">
-                                <Check className="text-purple-500 flex-shrink-0 mt-1" size={16} />
-                                <span className="text-gray-700">{tour}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {activitiesDetails.amenities && activitiesDetails.amenities.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-3">Tour Amenities:</h4>
-                          <div className="grid md:grid-cols-2 gap-2">
-                            {activitiesDetails.amenities.map((amenity, index) => (
-                              <div key={index} className="flex items-center gap-2">
-                                <Check className="text-orange-500 flex-shrink-0" size={16} />
-                                <span className="text-gray-700">{amenity}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+            {/* Exclusions */}
+            {exclusionsDetails && exclusionsDetails.items && exclusionsDetails.items.length > 0 && (
+              <div className="py-8 border-t border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Exclusions</h2>
+                <div className="grid md:grid-cols-2 gap-x-8 gap-y-3">
+                  {exclusionsDetails.items.map((item, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <span className="text-red-500 flex-shrink-0 mt-0.5 font-bold">✕</span>
+                      <span className="text-gray-700">{item}</span>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              </div>
+            )}
 
-                {/* Other Inclusions */}
-                {inclusionsDetails && (
-                  <div
-                    id="inclusions"
-                    data-animate
-                    className={`py-8 border-b border-gray-200 transition-all duration-700 ${
-                      isVisible.inclusions ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-                    }`}
-                  >
-                    <h2 className="text-2xl font-bold mb-6">{inclusionsDetails.title}</h2>
-                    {inclusionsDetails.description && (
-                      <p className="text-gray-600 mb-4">{inclusionsDetails.description}</p>
-                    )}
-                    {inclusionsDetails.items && inclusionsDetails.items.length > 0 && (
-                      <div className="space-y-2">
-                        {inclusionsDetails.items.map((item, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <Check className="text-red-500 flex-shrink-0 mt-1" size={16} />
-                            <span className="text-gray-700">{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+            {/* Itinerary */}
+            {pkg.itinerary && pkg.itinerary.length > 0 && (
+              <div className="py-8 border-t border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Daily Itinerary</h2>
+                <div className="space-y-4">
+                  {pkg.itinerary.map((day, index) => (
+                    <div key={index} className="border-l-2 border-blue-500 pl-4 py-2">
+                      <h4 className="font-semibold text-gray-900 mb-1">
+                        Day {day.day_number}: {day.title}
+                      </h4>
+                      <p className="text-gray-600 text-sm">{day.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Package Features Overview */}
-            <div className="bg-white rounded-2xl p-6 shadow-none border border-gray-200">
-              <h3 className="font-bold text-lg mb-4">What this trip includes</h3>
-              <div className="space-y-3">
-                {pkg.features && pkg.features.map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <Check className="text-green-500 flex-shrink-0" size={16} />
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Trip Details */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="font-bold text-lg mb-4">Trip Details</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Calendar size={16} className="text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Duration</div>
-                        <div className="font-semibold text-gray-900">{pkg.duration}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Users size={16} className="text-purple-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Group Size</div>
-                        <div className="font-semibold text-gray-900">{pkg.people || 2} People</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <Star size={16} className="text-yellow-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Rating</div>
-                        <div className="font-semibold text-gray-900">{pkg.rating || 0}/5 Stars</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Pricing and Booking */}
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white sticky top-4">
-              <div className="mb-6">
-                <div className="text-blue-100 text-sm mb-1">Starting from</div>
-                <div className="text-4xl font-bold">{pkg.price || `₱${pkg.price_value?.toLocaleString()}`}</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-4">
+              {/* Price Box */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className="text-sm text-gray-600 mb-1">Price Range</div>
+                {pkg.deals && pkg.deals.length > 0 ? (
+                  <div>
+                    {pkg.deals.length === 1 ? (
+                      <div className="text-3xl font-bold text-gray-900">
+                        ₱{Number(pkg.deals[0].deal_price).toLocaleString()}
+                      </div>
+                    ) : (
+                      <div className="text-2xl font-bold text-gray-900">
+                        ₱{Math.min(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()} - 
+                        ₱{Math.max(...pkg.deals.map(d => Number(d.deal_price))).toLocaleString()}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {pkg.deals.length} deal period{pkg.deals.length > 1 ? 's' : ''} available
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-3xl font-bold text-gray-900">₱0</div>
+                )}
               </div>
 
+              {/* Booking Button */}
               {authLoading ? (
-                <div className="w-full bg-white/20 py-3 rounded-lg mb-4 animate-pulse h-[48px]"></div>
+                <div className="w-full bg-gray-200 py-3 rounded-lg mb-4 animate-pulse h-[48px]"></div>
               ) : isAuthenticated ? (
                 <Link
                   href={`/packages/${pkg.slug}/book`}
-                  className="w-full bg-white text-blue-500 py-3 rounded-lg hover:bg-gray-100 transition font-bold text-lg mb-4 block text-center"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-center block mb-3"
                 >
                   Book This Package
                 </Link>
               ) : (
-                <div className="mb-4">
+                <div className="mb-3">
                   <button
                     onClick={() => router.push('/login')}
-                    className="w-full bg-white text-blue-500 py-3 rounded-lg hover:bg-gray-100 transition font-bold text-lg mb-3 flex items-center justify-center gap-2"
+                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center gap-2 mb-2"
                   >
                     <Lock size={18} />
                     Login to Book
                   </button>
-                  <p className="text-blue-100 text-xs text-center">
+                  <p className="text-gray-500 text-xs text-center">
                     Please log in or sign up to book this package
                   </p>
                 </div>
               )}
 
-              <button className="w-full bg-blue-700 text-white py-3 rounded-lg hover:bg-blue-800 transition font-semibold">
+              <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition font-semibold">
                 Contact Us
               </button>
 
-              <div className="mt-6 pt-6 border-t border-blue-400">
-                <div className="text-sm text-blue-100 mb-2">Need help?</div>
-                <div className="font-semibold">Call us: +1 (555) 123-4567</div>
+              {/* Package Info */}
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-4">
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Location</div>
+                  <div className="font-medium text-gray-900">
+                    {pkg.location}{pkg.country ? `, ${pkg.country}` : ''}
+                  </div>
+                </div>
+                {pkg.category && (
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">Category</div>
+                    <div className="font-medium text-gray-900">{pkg.category}</div>
+                  </div>
+                )}
+                {pkg.availability && (
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">Availability</div>
+                    <div className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${
+                      pkg.availability === 'Available' 
+                        ? 'bg-green-100 text-green-700'
+                        : pkg.availability === 'Limited'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {pkg.availability}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Info */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="text-sm text-gray-500 mb-2">Need help?</div>
+                <div className="font-semibold text-gray-900">Call us: +1 (555) 123-4567</div>
               </div>
             </div>
 
-
+            {/* Package Metadata */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-bold text-lg mb-4">Package Information</h3>
+              <div className="space-y-3 text-sm">
+                {pkg.deals && pkg.deals.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Deal Periods:</span>
+                    <span className="font-medium text-gray-900">{pkg.deals.length}</span>
+                  </div>
+                )}
+                {pkg.itinerary && pkg.itinerary.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Itinerary Days:</span>
+                    <span className="font-medium text-gray-900">{pkg.itinerary.length}</span>
+                  </div>
+                )}
+                {pkg.images && pkg.images.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Images:</span>
+                    <span className="font-medium text-gray-900">{pkg.images.length}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-3 border-t border-gray-200">
+                  <span className="text-gray-600">Package ID:</span>
+                  <span className="font-mono text-xs text-gray-900">{pkg.id?.substring(0, 8)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

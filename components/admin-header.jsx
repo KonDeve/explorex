@@ -20,9 +20,9 @@ export default function AdminHeader({ activePage = "dashboard" }) {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/admin/dashboard" className="text-2xl font-bold">
-            Xplore<span className="text-blue-500 italic">x</span>
-            <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-semibold">ADMIN</span>
+          <Link href="/admin/dashboard" className="flex items-center gap-2">
+            <img src="/Xplorex - BLACK.png" alt="Xplorex" className="h-10 w-auto" />
+            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-semibold">ADMIN</span>
           </Link>
 
           {/* Desktop Navigation */}

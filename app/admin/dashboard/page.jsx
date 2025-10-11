@@ -1,92 +1,102 @@
 "use client"
 
-import { TrendingUp, Users, Package, DollarSign, Calendar, Star, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { TrendingUp, Users, Package, DollarSign, Calendar, Star, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { getDashboardData } from "@/lib/adminDashboard"
 
 export default function AdminDashboard() {
+  const [dashboardData, setDashboardData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const result = await getDashboardData()
+        
+        if (result.success) {
+          setDashboardData(result.data)
+          setError(null)
+        } else {
+          setError(result.error)
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+        setError('Failed to load dashboard data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin text-blue-500 mx-auto mb-4" size={48} />
+          <p className="text-gray-600 text-lg">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-lg mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const stats = [
     {
       title: "Total Revenue",
-      value: "$124,500",
-      change: "+12.5%",
-      trend: "up",
+      value: `₱${dashboardData?.stats?.totalRevenue?.toLocaleString() || 0}`,
+      change: dashboardData?.stats?.revenueChange || 0,
+      trend: (dashboardData?.stats?.revenueChange || 0) >= 0 ? "up" : "down",
       icon: DollarSign,
       color: "bg-green-500",
     },
     {
       title: "Active Bookings",
-      value: "48",
-      change: "+8.2%",
-      trend: "up",
+      value: dashboardData?.stats?.activeBookings || 0,
+      change: dashboardData?.stats?.activeBookingsChange || 0,
+      trend: (dashboardData?.stats?.activeBookingsChange || 0) >= 0 ? "up" : "down",
       icon: Calendar,
       color: "bg-blue-500",
     },
     {
       title: "Total Customers",
-      value: "1,234",
-      change: "+15.3%",
-      trend: "up",
+      value: dashboardData?.stats?.totalCustomers?.toLocaleString() || 0,
+      change: dashboardData?.stats?.customersChange || 0,
+      trend: (dashboardData?.stats?.customersChange || 0) >= 0 ? "up" : "down",
       icon: Users,
       color: "bg-purple-500",
     },
     {
       title: "Available Packages",
-      value: "24",
-      change: "-2.1%",
-      trend: "down",
+      value: dashboardData?.stats?.totalPackages || 0,
+      change: dashboardData?.stats?.packagesChange || 0,
+      trend: (dashboardData?.stats?.packagesChange || 0) >= 0 ? "up" : "down",
       icon: Package,
       color: "bg-orange-500",
     },
   ]
 
-  const recentBookings = [
-    {
-      id: "BK-001",
-      customer: "John Doe",
-      package: "Santorini Paradise",
-      date: "2025-06-15",
-      amount: "$2,499",
-      status: "confirmed",
-    },
-    {
-      id: "BK-002",
-      customer: "Jane Smith",
-      package: "Venice Romance",
-      date: "2025-07-20",
-      amount: "$1,899",
-      status: "pending",
-    },
-    {
-      id: "BK-003",
-      customer: "Mike Johnson",
-      package: "Alpine Adventure",
-      date: "2025-08-10",
-      amount: "$2,799",
-      status: "confirmed",
-    },
-    {
-      id: "BK-004",
-      customer: "Sarah Williams",
-      package: "Tropical Escape",
-      date: "2025-09-05",
-      amount: "$3,299",
-      status: "confirmed",
-    },
-    {
-      id: "BK-005",
-      customer: "David Brown",
-      package: "Greek Islands Tour",
-      date: "2025-10-12",
-      amount: "$2,199",
-      status: "pending",
-    },
-  ]
-
-  const topPackages = [
-    { name: "Santorini Paradise", bookings: 45, revenue: "$112,455", rating: 4.9 },
-    { name: "Tropical Escape", bookings: 38, revenue: "$125,362", rating: 4.9 },
-    { name: "Alpine Adventure", bookings: 32, revenue: "$89,568", rating: 5.0 },
-    { name: "Venice Romance", bookings: 28, revenue: "$53,172", rating: 4.8 },
-  ]
+  const recentBookings = dashboardData?.recentBookings || []
+  const topPackages = dashboardData?.topPackages || []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -100,6 +110,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat, index) => {
           const Icon = stat.icon
+          const changeValue = typeof stat.change === 'number' ? stat.change : parseFloat(stat.change) || 0
+          const changeText = changeValue >= 0 ? `+${changeValue.toFixed(1)}%` : `${changeValue.toFixed(1)}%`
+          
           return (
             <div key={index} className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
@@ -112,7 +125,7 @@ export default function AdminDashboard() {
                   }`}
                 >
                   {stat.trend === "up" ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                  {stat.change}
+                  {changeText}
                 </div>
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">{stat.title}</h3>
@@ -145,26 +158,38 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentBookings.map((booking) => (
-                  <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                    <td className="py-4 px-4 text-sm font-medium text-gray-900">{booking.id}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{booking.customer}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{booking.package}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{booking.date}</td>
-                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">{booking.amount}</td>
-                    <td className="py-4 px-4">
-                      <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                          booking.status === "confirmed"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {booking.status}
-                      </span>
+                {recentBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-8 text-gray-500">
+                      No recent bookings found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  recentBookings.map((booking) => (
+                    <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                      <td className="py-4 px-4 text-sm font-medium text-gray-900">{booking.id}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{booking.customer}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{booking.package}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{booking.date}</td>
+                      <td className="py-4 px-4 text-sm font-semibold text-gray-900">₱{booking.amount?.toLocaleString()}</td>
+                      <td className="py-4 px-4">
+                        <span
+                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                            booking.status === "confirmed"
+                              ? "bg-green-100 text-green-700"
+                              : booking.status === "pending"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : booking.status === "cancelled"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {booking.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -175,21 +200,25 @@ export default function AdminDashboard() {
           <h2 className="text-xl font-bold text-gray-900 mb-6">Top Packages</h2>
 
           <div className="space-y-4">
-            {topPackages.map((pkg, index) => (
-              <div key={index} className="pb-4 border-b border-gray-100 last:border-0">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900 text-sm">{pkg.name}</h3>
-                  <div className="flex items-center gap-1">
-                    <Star className="fill-yellow-400 text-yellow-400" size={14} />
-                    <span className="text-sm font-semibold text-gray-900">{pkg.rating}</span>
+            {topPackages.length === 0 ? (
+              <p className="text-center py-8 text-gray-500">No package data available</p>
+            ) : (
+              topPackages.map((pkg, index) => (
+                <div key={index} className="pb-4 border-b border-gray-100 last:border-0">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 text-sm">{pkg.name}</h3>
+                    <div className="flex items-center gap-1">
+                      <Star className="fill-yellow-400 text-yellow-400" size={14} />
+                      <span className="text-sm font-semibold text-gray-900">{pkg.rating?.toFixed(1) || '0.0'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <span>{pkg.bookings} bookings</span>
+                    <span className="font-semibold text-gray-900">₱{pkg.revenue?.toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>{pkg.bookings} bookings</span>
-                  <span className="font-semibold text-gray-900">{pkg.revenue}</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

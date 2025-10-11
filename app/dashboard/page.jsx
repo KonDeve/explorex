@@ -6,7 +6,8 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/AuthContext"
 import { useRouter } from "next/navigation"
-import { getUserBookings } from "@/lib/bookings"
+import { getUserBookings, autoCancelExpiredBookings } from "@/lib/bookings"
+import { createCheckoutSession } from "@/lib/paymongo"
 
 export default function CustomerDashboard() {
   const router = useRouter()
@@ -29,8 +30,16 @@ export default function CustomerDashboard() {
       if (user) {
         setLoadingBookings(true)
         try {
+          // First, auto-cancel any expired bookings (with remaining balance < 45 days)
+          console.log('Checking for expired bookings to auto-cancel...')
+          await autoCancelExpiredBookings()
+          
+          // Then fetch user bookings
+          console.log('Fetching bookings for user:', user.id)
           const result = await getUserBookings(user.id)
+          console.log('Bookings result:', result)
           if (result.success) {
+            console.log('Bookings data:', result.bookings)
             setBookings(result.bookings)
           } else {
             console.error('Failed to fetch bookings:', result.error)
@@ -80,24 +89,116 @@ export default function CustomerDashboard() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  console.log('Today:', today, 'ISO:', today.toISOString())
+  console.log('All bookings:', bookings)
+
+  // Upcoming bookings: check-out date is today or in the future (trip is ongoing or upcoming)
   const upcomingBookings = bookings.filter(booking => {
-    const checkInDate = new Date(booking.check_in_date)
-    return checkInDate >= today && booking.status !== 'cancelled'
+    const checkOutDate = new Date(booking.check_out_date)
+    console.log('Booking:', booking.booking_number, 'Check-out:', booking.check_out_date, 'Parsed:', checkOutDate, 'Status:', booking.status)
+    console.log('Is upcoming/active?', checkOutDate >= today, 'Not cancelled?', booking.status !== 'cancelled')
+    return checkOutDate >= today && booking.status !== 'cancelled'
   })
 
+  // Past bookings: check-out date has passed, or booking is cancelled/completed
   const pastBookings = bookings.filter(booking => {
     const checkOutDate = new Date(booking.check_out_date)
-    return checkOutDate < today || booking.status === 'cancelled' || booking.status === 'completed'
+    console.log('Booking:', booking.booking_number, 'Check-out:', booking.check_out_date, 'Parsed:', checkOutDate)
+    const isPast = checkOutDate < today || booking.status === 'cancelled' || booking.status === 'completed'
+    console.log('Is past?', isPast)
+    return isPast
   })
 
-  // Calculate stats
-  const totalSpent = bookings.reduce((sum, booking) => sum + (booking.total_amount || 0), 0)
+  console.log('Total bookings:', bookings.length)
+  console.log('Upcoming bookings:', upcomingBookings.length, upcomingBookings)
+  console.log('Past bookings:', pastBookings.length, pastBookings)
+
+  // Calculate stats - Total spent should be only what customer has actually paid
+  const totalSpent = bookings.reduce((sum, booking) => sum + parseFloat(booking.amount_paid || 0), 0)
   const placesVisited = pastBookings.filter(b => b.status === 'completed').length
 
   const handleViewDetails = (booking) => {
     // Navigate to trip details page using slug
     const slug = booking.package?.slug || booking.id
-    window.location.href = `/dashboard/trip/${slug}`
+    router.push(`/dashboard/trip/${slug}`)
+  }
+
+  const handlePayNow = async (booking) => {
+    try {
+      // Calculate remaining balance
+      const remainingBalance = parseFloat(booking.remaining_balance || 0)
+      
+      if (remainingBalance <= 0) {
+        alert('No remaining balance to pay')
+        return
+      }
+
+      // Check if payment deadline has passed (45 days before travel)
+      const checkInDate = new Date(booking.check_in_date)
+      checkInDate.setHours(0, 0, 0, 0)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      // Calculate payment deadline (45 days before travel)
+      const paymentDeadline = new Date(checkInDate)
+      paymentDeadline.setDate(paymentDeadline.getDate() - 45)
+      const daysUntilDeadline = Math.ceil((paymentDeadline - today) / (1000 * 60 * 60 * 24))
+
+      if (daysUntilDeadline < 0) {
+        alert(
+          `This booking cannot be paid. The payment deadline was ${paymentDeadline.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ` +
+          `(${Math.abs(daysUntilDeadline)} ${Math.abs(daysUntilDeadline) === 1 ? 'day' : 'days'} ago).\n\n` +
+          `According to our policy, bookings with remaining balance must be paid at least 45 days before travel.\n\n` +
+          `This booking will be automatically cancelled and is non-refundable.`
+        )
+        // Refresh to show updated booking status
+        window.location.reload()
+        return
+      }
+
+      // Get package info for better description
+      const packageTitle = booking.package?.title || 'Travel Package'
+      const packageImage = booking.package?.images?.[0]
+      const fullImageUrl = packageImage && (packageImage.startsWith('http://') || packageImage.startsWith('https://'))
+        ? packageImage
+        : null
+
+      // Create PayMongo checkout session for remaining balance
+      const result = await createCheckoutSession({
+        amount: remainingBalance,
+        description: `Remaining Balance Payment - ${packageTitle}`,
+        lineItems: [
+          {
+            name: `${packageTitle} - Remaining Balance`,
+            quantity: 1,
+            amount: remainingBalance,
+            description: `Booking ${booking.booking_number} | ${booking.check_in_date} to ${booking.check_out_date}`,
+            images: fullImageUrl ? [fullImageUrl] : []
+          }
+        ],
+        billing: {
+          name: `${booking.customer_first_name} ${booking.customer_last_name}`,
+          email: booking.customer_email
+        },
+        successUrl: `${window.location.origin}/dashboard/trip/${booking.package?.slug || booking.id}/payment/success?booking_id=${booking.id}`,
+        cancelUrl: `${window.location.origin}/dashboard`
+      })
+
+      if (result.success && result.checkoutUrl) {
+        // Store session info for verification
+        localStorage.setItem('paymongo_session_id', result.sessionId)
+        localStorage.setItem('paymongo_booking_id', booking.id)
+        
+        // Redirect directly to PayMongo checkout
+        window.location.href = result.checkoutUrl
+      } else {
+        console.error('Failed to create checkout session:', result.error)
+        alert('Failed to initiate payment. Please try again.')
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      alert('An error occurred. Please try again.')
+    }
   }
 
   return (
@@ -262,6 +363,23 @@ export default function CustomerDashboard() {
                     const bookingDate = new Date(booking.booking_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                     const remainingBalance = booking.remaining_balance || 0
                     
+                    // Calculate days until trip and payment deadline
+                    const checkInDate = new Date(booking.check_in_date)
+                    checkInDate.setHours(0, 0, 0, 0)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const daysUntilTrip = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24))
+                    
+                    // Calculate payment deadline (45 days before travel)
+                    const paymentDeadline = new Date(checkInDate)
+                    paymentDeadline.setDate(paymentDeadline.getDate() - 45)
+                    const daysUntilDeadline = Math.ceil((paymentDeadline - today) / (1000 * 60 * 60 * 24))
+                    
+                    // Check if booking is at risk of auto-cancellation
+                    const hasRemainingBalance = remainingBalance > 0
+                    const isWithin45Days = daysUntilDeadline < 0 // Deadline has passed
+                    const isAtRisk = hasRemainingBalance && isWithin45Days
+                    
                     return (
                       <div
                         key={booking.id}
@@ -274,22 +392,28 @@ export default function CustomerDashboard() {
                               alt={packageData.title}
                               className="w-full h-full object-cover"
                             />
-                            <div className="absolute top-4 left-4">
-                              <span className={`px-4 py-1.5 rounded-md text-sm font-semibold ${
-                                booking.status === 'confirmed' ? 'bg-green-500 text-white' :
-                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
-                                'bg-gray-500 text-white'
+                            <div className="absolute top-4 left-4 flex flex-col gap-2">
+                              <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold shadow-md ${
+                                booking.status === 'confirmed' ? 'bg-emerald-500 text-white' :
+                                booking.status === 'pending' ? 'bg-amber-500 text-white' :
+                                'bg-slate-500 text-white'
                               }`}>
                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                               </span>
-                            </div>
-                            {remainingBalance > 0 && (
-                              <div className="absolute top-14 left-4">
-                                <span className="bg-orange-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold">
-                                  Partial Payment
+                              {booking.payment_status !== 'pending' && (
+                                <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold shadow-md ${
+                                  booking.payment_status === 'paid' ? 'bg-emerald-500 text-white' :
+                                  booking.payment_status === 'needs_payment' ? 'bg-rose-500 text-white' :
+                                  booking.payment_status === 'partial' ? 'bg-orange-500 text-white' :
+                                  'bg-amber-500 text-white'
+                                }`}>
+                                  {booking.payment_status === "needs_payment" ? "Needs Payment" : 
+                                   booking.payment_status === "paid" ? "Paid" :
+                                   booking.payment_status === "partial" ? "Partial Payment" :
+                                   booking.payment_status.charAt(0).toUpperCase() + booking.payment_status.slice(1)}
                                 </span>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                           <div className="p-6">
                             <div className="flex items-start justify-between mb-6">
@@ -328,6 +452,26 @@ export default function CustomerDashboard() {
                               </div>
                             </div>
 
+                            {/* Warning for bookings at risk of cancellation */}
+                            {isAtRisk && (
+                              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0">
+                                    <svg className="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="text-sm font-bold text-red-900 mb-1">⚠️ Payment Deadline Passed</h4>
+                                    <p className="text-xs text-red-800 leading-relaxed">
+                                      Payment deadline was <strong>{paymentDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong> ({Math.abs(daysUntilDeadline)} {Math.abs(daysUntilDeadline) === 1 ? 'day' : 'days'} ago).
+                                      This booking can no longer be paid and will be <strong>automatically cancelled</strong> with <strong>no refund</strong>.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-200">
                               <div>
                                 <div className="text-xs text-gray-500 mb-1">Total Package</div>
@@ -340,23 +484,56 @@ export default function CustomerDashboard() {
                               <div>
                                 <div className="text-xs text-gray-500 mb-1">Remaining Balance</div>
                                 <div className="text-lg font-bold text-orange-600">₱{remainingBalance.toLocaleString()}</div>
-                                {booking.payment_due_date && (
-                                  <div className="text-xs text-gray-400">Due: {new Date(booking.payment_due_date).toLocaleDateString()}</div>
+                                {remainingBalance > 0 && (
+                                  <div className="mt-1">
+                                    {daysUntilDeadline >= 0 ? (
+                                      <div className="text-xs text-gray-600">
+                                        Pay before: <span className="font-semibold">{paymentDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                      </div>
+                                    ) : null}
+                                    <div className={`text-xs font-semibold mt-0.5 ${
+                                      daysUntilDeadline < 0 ? 'text-red-600' : 
+                                      daysUntilDeadline <= 5 ? 'text-red-600' : 
+                                      daysUntilDeadline <= 15 ? 'text-orange-600' : 
+                                      'text-blue-600'
+                                    }`}>
+                                      {daysUntilDeadline >= 0 ? (
+                                        `${daysUntilDeadline} ${daysUntilDeadline === 1 ? 'day' : 'days'} left to pay`
+                                      ) : (
+                                        `Deadline passed (${Math.abs(daysUntilDeadline)} ${Math.abs(daysUntilDeadline) === 1 ? 'day' : 'days'} ago)`
+                                      )}
+                                    </div>
+                                  </div>
                                 )}
+                              </div>
                             </div>
-                          </div>
 
                           <div className="flex gap-3">
                             <button 
                               onClick={() => handleViewDetails(booking)}
-                              className="flex-1 bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition font-medium"
+                              className={`${remainingBalance > 0 && (booking.payment_status === 'needs_payment' || booking.payment_status === 'partial') && !isAtRisk ? 'flex-1' : 'w-full'} bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition font-medium`}
                             >
                               View Details
                             </button>
-                            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
-                              <CreditCard size={18} />
-                              Pay Remaining Balance
-                            </button>
+                            {remainingBalance > 0 && (booking.payment_status === 'needs_payment' || booking.payment_status === 'partial') && !isAtRisk && (
+                              <button 
+                                onClick={() => handlePayNow(booking)}
+                                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
+                              >
+                                <CreditCard size={18} />
+                                Pay Remaining Balance
+                              </button>
+                            )}
+                            {isAtRisk && (
+                              <button 
+                                disabled
+                                className="bg-gray-300 text-gray-500 px-8 py-3 rounded-lg cursor-not-allowed font-medium flex items-center gap-2"
+                                title="Payment deadline has passed"
+                              >
+                                <CreditCard size={18} />
+                                Payment Unavailable
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -384,6 +561,19 @@ export default function CustomerDashboard() {
                         {upcomingBookings.map((booking) => {
                           const packageData = booking.package || {}
                           const bookingImage = packageData.images?.[0] || "/placeholder.svg"
+                          const remainingBalance = booking.remaining_balance || 0
+                          
+                          // Calculate days until trip and payment deadline for table view
+                          const checkInDate = new Date(booking.check_in_date)
+                          checkInDate.setHours(0, 0, 0, 0)
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          const daysUntilTrip = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24))
+                          
+                          // Calculate payment deadline (45 days before travel)
+                          const paymentDeadline = new Date(checkInDate)
+                          paymentDeadline.setDate(paymentDeadline.getDate() - 45)
+                          const daysUntilDeadline = Math.ceil((paymentDeadline - today) / (1000 * 60 * 60 * 24))
                           
                           return (
                             <tr key={booking.id} className="hover:bg-gray-50 transition">
@@ -415,6 +605,21 @@ export default function CustomerDashboard() {
                                 }`}>
                                   {booking.status}
                                 </span>
+                                {/* Payment deadline indicator in table */}
+                                {remainingBalance > 0 && (
+                                  <div className={`text-xs font-semibold mt-1 ${
+                                    daysUntilDeadline < 0 ? 'text-red-600' :
+                                    daysUntilDeadline <= 5 ? 'text-red-600' :
+                                    daysUntilDeadline <= 15 ? 'text-orange-600' :
+                                    'text-blue-600'
+                                  }`}>
+                                    {daysUntilDeadline >= 0 ? (
+                                      `⏰ ${daysUntilDeadline}d to pay`
+                                    ) : (
+                                      `⚠️ Deadline passed`
+                                    )}
+                                  </div>
+                                )}
                               </td>
                             <td className="px-6 py-4">
                               <div className="flex gap-2">
@@ -456,16 +661,16 @@ export default function CustomerDashboard() {
                   >
                     <div className="h-48 overflow-hidden">
                       <img
-                        src={booking.image || "/placeholder.svg"}
-                        alt={booking.package}
+                        src={booking.package?.images?.[0] || '/placeholder.svg'}
+                        alt={booking.package?.title || 'Travel package'}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="p-6">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">{booking.package}</h3>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">{booking.package?.title || 'Travel Package'}</h3>
                       <div className="flex items-center gap-2 text-gray-600 mb-4">
                         <MapPin size={16} />
-                        <span>{booking.location}</span>
+                        <span>{booking.package?.location || 'Unknown'}{booking.package?.country ? `, ${booking.package.country}` : ''}</span>
                       </div>
                       <div className="text-sm text-gray-500 mb-4">Traveled on {booking.date}</div>
                       <div className="flex gap-2">

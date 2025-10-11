@@ -35,8 +35,8 @@ CREATE TABLE packages (
     title VARCHAR(255) NOT NULL,
     location VARCHAR(255) NOT NULL,
     country VARCHAR(100),
-    duration VARCHAR(100) NOT NULL,
-    people VARCHAR(50), -- e.g., "2-4 People"
+    duration VARCHAR(100), -- Made nullable, can be removed if not needed
+    people INTEGER NOT NULL CHECK (people > 0), -- Number of people (e.g., 4)
     price VARCHAR(50) NOT NULL, -- Formatted price like "$2,499"
     price_value DECIMAL(10,2) NOT NULL, -- Numeric value for calculations
     rating DECIMAL(3,2) DEFAULT 0.00,
@@ -83,6 +83,25 @@ CREATE TABLE package_itinerary (
 );
 
 -- =============================================
+-- PACKAGE DEALS TABLE (Multiple Date Ranges)
+-- =============================================
+CREATE TABLE package_deals (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    package_id UUID REFERENCES packages(id) ON DELETE CASCADE,
+    deal_start_date DATE NOT NULL,
+    deal_end_date DATE NOT NULL,
+    slots_available INTEGER DEFAULT 0,
+    slots_booked INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT check_deal_dates CHECK (deal_end_date >= deal_start_date),
+    CONSTRAINT check_slots CHECK (slots_booked <= slots_available)
+);
+
+-- =============================================
 -- BOOKINGS TABLE
 -- =============================================
 CREATE TABLE bookings (
@@ -90,6 +109,7 @@ CREATE TABLE bookings (
     booking_number VARCHAR(50) UNIQUE NOT NULL, -- Format: BK-001, BK-002, etc.
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     package_id UUID REFERENCES packages(id) ON DELETE CASCADE,
+    deal_id UUID REFERENCES package_deals(id) ON DELETE SET NULL, -- Link to specific deal period
     
     -- Guest Information
     customer_first_name VARCHAR(100) NOT NULL,
@@ -117,7 +137,7 @@ CREATE TABLE bookings (
     total_amount DECIMAL(10,2) NOT NULL,
     
     -- Payment Information
-    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'partial', 'paid', 'failed', 'refunded')),
+    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'needs_payment', 'partial', 'paid', 'failed', 'refunded')),
     amount_paid DECIMAL(10,2) DEFAULT 0.00,
     remaining_balance DECIMAL(10,2) DEFAULT 0.00,
     payment_due_date DATE,
@@ -348,6 +368,12 @@ CREATE INDEX idx_messages_booking_id ON messages(booking_id);
 CREATE INDEX idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
 
+-- Package deals indexes
+CREATE INDEX idx_package_deals_package_id ON package_deals(package_id);
+CREATE INDEX idx_package_deals_dates ON package_deals(deal_start_date, deal_end_date);
+CREATE INDEX idx_package_deals_active ON package_deals(is_active);
+CREATE INDEX idx_bookings_deal_id ON bookings(deal_id);
+
 -- =============================================
 -- TRIGGERS FOR AUTOMATED UPDATES
 -- =============================================
@@ -364,9 +390,73 @@ $$ LANGUAGE plpgsql;
 -- Apply updated_at triggers to relevant tables
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_package_deals_updated_at BEFORE UPDATE ON package_deals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Function to automatically update deal slots when bookings are created/cancelled
+CREATE OR REPLACE FUNCTION update_deal_slots()
+RETURNS TRIGGER AS $$
+DECLARE
+    matching_deal_id UUID;
+BEGIN
+    -- For INSERT: Find matching deal based on check_in_date and increment slots_booked
+    IF TG_OP = 'INSERT' AND NEW.status != 'cancelled' THEN
+        SELECT id INTO matching_deal_id
+        FROM package_deals
+        WHERE package_id = NEW.package_id
+          AND deal_start_date <= NEW.check_in_date
+          AND deal_end_date >= NEW.check_in_date
+          AND is_active = TRUE
+        ORDER BY deal_start_date ASC
+        LIMIT 1;
+        
+        IF matching_deal_id IS NOT NULL THEN
+            -- Set the deal_id on the booking
+            NEW.deal_id = matching_deal_id;
+            
+            -- Increment slots_booked
+            UPDATE package_deals
+            SET slots_booked = slots_booked + 1
+            WHERE id = matching_deal_id;
+        END IF;
+    END IF;
+    
+    -- For UPDATE: Handle status changes (e.g., booking cancelled)
+    IF TG_OP = 'UPDATE' THEN
+        -- If booking was cancelled, decrement slots
+        IF OLD.status != 'cancelled' AND NEW.status = 'cancelled' AND OLD.deal_id IS NOT NULL THEN
+            UPDATE package_deals
+            SET slots_booked = GREATEST(0, slots_booked - 1)
+            WHERE id = OLD.deal_id;
+        END IF;
+        
+        -- If booking was reactivated from cancelled
+        IF OLD.status = 'cancelled' AND NEW.status != 'cancelled' AND OLD.deal_id IS NOT NULL THEN
+            UPDATE package_deals
+            SET slots_booked = slots_booked + 1
+            WHERE id = OLD.deal_id;
+        END IF;
+    END IF;
+    
+    -- For DELETE: Decrement slots if booking had a deal
+    IF TG_OP = 'DELETE' AND OLD.deal_id IS NOT NULL AND OLD.status != 'cancelled' THEN
+        UPDATE package_deals
+        SET slots_booked = GREATEST(0, slots_booked - 1)
+        WHERE id = OLD.deal_id;
+        
+        RETURN OLD;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply deal slots trigger to bookings table
+CREATE TRIGGER trigger_update_deal_slots
+BEFORE INSERT OR UPDATE OR DELETE ON bookings
+FOR EACH ROW EXECUTE FUNCTION update_deal_slots();
 
 -- Function to update package rating when reviews are added/updated
 CREATE OR REPLACE FUNCTION update_package_rating()
@@ -439,6 +529,28 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_user_stats_trigger 
     AFTER INSERT OR UPDATE OR DELETE ON bookings 
     FOR EACH ROW EXECUTE FUNCTION update_user_stats();
+
+-- Function to update payment status when booking is confirmed
+CREATE OR REPLACE FUNCTION update_payment_status_on_confirmation()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If booking status is being changed to confirmed, update payment status to needs_payment
+    IF TG_OP = 'UPDATE' AND OLD.status != 'confirmed' AND NEW.status = 'confirmed' THEN
+        NEW.payment_status = 'needs_payment';
+        -- Set payment due date to 7 days from confirmation if not already set
+        IF NEW.payment_due_date IS NULL THEN
+            NEW.payment_due_date = CURRENT_DATE + INTERVAL '7 days';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply payment status update trigger
+CREATE TRIGGER update_payment_status_on_confirmation_trigger 
+    BEFORE UPDATE ON bookings 
+    FOR EACH ROW EXECUTE FUNCTION update_payment_status_on_confirmation();
 
 -- =============================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -823,6 +935,52 @@ INSERT INTO package_itinerary (package_id, day_number, title, description) VALUE
 ('550e8400-e29b-41d4-a716-446655440004', 7, 'Final Paradise', 'Leisurely morning and spa. Farewell dinner under the stars.'),
 ('550e8400-e29b-41d4-a716-446655440004', 8, 'Departure', 'Final breakfast and seaplane transfer back to Male Airport.');
 
+-- =============================================
+-- HELPER FUNCTIONS FOR PACKAGE DEALS
+-- =============================================
+
+-- Function to get all available deals for a package
+CREATE OR REPLACE FUNCTION get_available_deals(p_package_id UUID)
+RETURNS TABLE (
+    deal_id UUID,
+    deal_start_date DATE,
+    deal_end_date DATE,
+    slots_available INTEGER,
+    slots_booked INTEGER,
+    slots_remaining INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        id,
+        package_deals.deal_start_date,
+        package_deals.deal_end_date,
+        package_deals.slots_available,
+        package_deals.slots_booked,
+        (package_deals.slots_available - package_deals.slots_booked) AS slots_remaining
+    FROM package_deals
+    WHERE package_id = p_package_id
+      AND is_active = TRUE
+      AND (package_deals.slots_available - package_deals.slots_booked) > 0
+    ORDER BY package_deals.deal_start_date ASC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check if a specific deal has availability
+CREATE OR REPLACE FUNCTION check_deal_availability(p_deal_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    remaining_slots INTEGER;
+BEGIN
+    SELECT (slots_available - slots_booked) INTO remaining_slots
+    FROM package_deals
+    WHERE id = p_deal_id AND is_active = TRUE;
+    
+    RETURN COALESCE(remaining_slots, 0) > 0;
+END;
+$$ LANGUAGE plpgsql;
+
 -- This completes the comprehensive database schema for the Xplorex travel website
 -- All tables include proper relationships, constraints, indexes, and security policies
 -- The schema supports all features identified in the frontend application
+-- Package deals system supports multiple date ranges per package with automatic slot tracking
